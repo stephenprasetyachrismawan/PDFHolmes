@@ -1,0 +1,71 @@
+{
+  "version": "1.0.0",
+  "embeddingDim": 1536,
+  "groups": [
+    { "key": "metadata", "label": "Metadata & Identifikasi", "tab": "Ikhtisar" },
+    { "key": "context", "label": "Konteks & Motivasi", "tab": "Ikhtisar" },
+    { "key": "literature", "label": "Posisi terhadap Literatur", "tab": "Ikhtisar" },
+    { "key": "methodology", "label": "Metodologi", "tab": "Metodologi" },
+    { "key": "results", "label": "Hasil & Evaluasi", "tab": "Hasil" },
+    { "key": "discussion", "label": "Diskusi & Refleksi Kritis", "tab": "Analisis Kritis & Gap" },
+    { "key": "conclusion", "label": "Penutup", "tab": "Hasil" },
+    { "key": "pdfholmes", "label": "Output Analitis PDFHo!mes", "tab": "Analisis Kritis & Gap" }
+  ],
+  "fields": [
+    { "key": "judul", "label": "Judul", "group": "metadata", "order": 1, "auto": true, "defaultSource": "extracted", "prompt": "Sebutkan judul lengkap paper persis seperti tertulis." },
+    { "key": "penulis_afiliasi", "label": "Penulis & Afiliasi", "group": "metadata", "order": 2, "auto": true, "defaultSource": "extracted", "prompt": "Daftar penulis dan afiliasi masing-masing." },
+    { "key": "tahun_venue_doi", "label": "Tahun, Venue/Jurnal, DOI", "group": "metadata", "order": 3, "auto": true, "defaultSource": "extracted", "prompt": "Tahun publikasi, venue/jurnal/konferensi, dan DOI bila ada." },
+    { "key": "kata_kunci", "label": "Kata Kunci", "group": "metadata", "order": 4, "auto": true, "defaultSource": "extracted", "prompt": "Daftar kata kunci yang dinyatakan penulis." },
+    { "key": "jenis_paper", "label": "Jenis Paper", "group": "metadata", "order": 5, "auto": false, "defaultSource": "inferred", "prompt": "Klasifikasikan: empiris, review, teoritis, systematic review, atau position paper. Beri alasan singkat." },
+    { "key": "bidang_subbidang", "label": "Bidang & Sub-bidang", "group": "metadata", "order": 6, "auto": false, "defaultSource": "inferred", "prompt": "Tentukan bidang utama dan sub-bidang penelitian." },
+
+    { "key": "latar_belakang", "label": "Latar Belakang", "group": "context", "order": 7, "auto": false, "defaultSource": "hybrid", "prompt": "Jelaskan konteks bidang dan mengapa topik ini penting." },
+    { "key": "rumusan_masalah", "label": "Rumusan Masalah", "group": "context", "order": 8, "auto": false, "defaultSource": "extracted", "prompt": "Nyatakan masalah inti yang dijawab paper." },
+    { "key": "motivasi_urgensi", "label": "Motivasi & Urgensi", "group": "context", "order": 9, "auto": false, "defaultSource": "hybrid", "prompt": "Celah/persoalan yang memicu penelitian dan urgensinya." },
+    { "key": "pertanyaan_penelitian", "label": "Pertanyaan Penelitian", "group": "context", "order": 10, "auto": false, "defaultSource": "hybrid", "prompt": "Daftar research question eksplisit atau implisit." },
+    { "key": "tujuan_penelitian", "label": "Tujuan Penelitian", "group": "context", "order": 11, "auto": false, "defaultSource": "extracted", "prompt": "Daftar tujuan/objectives penelitian." },
+    { "key": "hipotesis", "label": "Hipotesis", "group": "context", "order": 12, "auto": false, "defaultSource": "extracted", "prompt": "Hipotesis bila ada (penelitian kuantitatif). Tulis 'Tidak dinyatakan' jika tidak ada." },
+    { "key": "klaim_kontribusi", "label": "Klaim Kontribusi", "group": "context", "order": 13, "auto": false, "defaultSource": "extracted", "prompt": "Apa yang penulis nyatakan sebagai sumbangan baru." },
+
+    { "key": "related_work", "label": "Ringkasan Related Work", "group": "literature", "order": 14, "auto": false, "defaultSource": "extracted", "prompt": "Ringkas penelitian terdahulu yang relevan menurut paper." },
+    { "key": "state_of_the_art", "label": "State of the Art", "group": "literature", "order": 15, "auto": false, "defaultSource": "hybrid", "prompt": "Kondisi terkini bidang menurut paper." },
+    { "key": "gap_penulis", "label": "Gap yang Dinyatakan Penulis", "group": "literature", "order": 16, "auto": false, "defaultSource": "extracted", "prompt": "Celah yang secara EKSPLISIT diklaim penulis. Hanya yang dinyatakan, jangan inferensi." },
+    { "key": "kerangka_teori", "label": "Kerangka Teori / Konseptual", "group": "literature", "order": 17, "auto": false, "defaultSource": "extracted", "prompt": "Teori/model yang melandasi penelitian." },
+
+    { "key": "pendekatan_desain", "label": "Pendekatan & Desain Penelitian", "group": "methodology", "order": 18, "auto": false, "defaultSource": "extracted", "prompt": "Eksperimen, studi kasus, survei, simulasi, dll." },
+    { "key": "metode_algoritma", "label": "Metode / Algoritma / Model", "group": "methodology", "order": 19, "auto": false, "defaultSource": "extracted", "prompt": "Inti teknis pendekatan." },
+    { "key": "dataset", "label": "Dataset & Sumber Data", "group": "methodology", "order": 20, "auto": false, "defaultSource": "extracted", "prompt": "Data yang dipakai, ukuran, asal." },
+    { "key": "variabel_parameter", "label": "Variabel & Parameter", "group": "methodology", "order": 21, "auto": false, "defaultSource": "extracted", "prompt": "Variabel bebas/terikat, hyperparameter penting." },
+    { "key": "setup_eksperimen", "label": "Setup Eksperimen", "group": "methodology", "order": 22, "auto": false, "defaultSource": "extracted", "prompt": "Konfigurasi, lingkungan, perangkat, seed." },
+    { "key": "metrik_evaluasi", "label": "Metrik Evaluasi", "group": "methodology", "order": 23, "auto": false, "defaultSource": "extracted", "prompt": "Metrik yang diukur dan definisinya." },
+    { "key": "baseline", "label": "Baseline / Pembanding", "group": "methodology", "order": 24, "auto": false, "defaultSource": "extracted", "prompt": "Terhadap apa metode dibandingkan." },
+
+    { "key": "temuan_utama", "label": "Temuan Utama", "group": "results", "order": 25, "auto": false, "defaultSource": "extracted", "prompt": "Ringkas inti hasil." },
+    { "key": "hasil_kuantitatif", "label": "Hasil Kuantitatif", "group": "results", "order": 26, "auto": false, "defaultSource": "extracted", "prompt": "Angka/tabel kunci (akurasi, p-value, dsb.)." },
+    { "key": "hasil_kualitatif", "label": "Hasil Kualitatif", "group": "results", "order": 27, "auto": false, "defaultSource": "extracted", "prompt": "Observasi non-numerik bila ada." },
+    { "key": "analisis_statistik", "label": "Analisis Statistik & Signifikansi", "group": "results", "order": 28, "auto": false, "defaultSource": "extracted", "prompt": "Uji yang dipakai dan signifikansi." },
+    { "key": "ablation", "label": "Ablation / Analisis Sensitivitas", "group": "results", "order": 29, "auto": false, "defaultSource": "extracted", "prompt": "Kontribusi tiap komponen. Tulis 'Tidak ada' bila tidak dilaporkan." },
+    { "key": "perbandingan_sota", "label": "Perbandingan dengan Baseline/SOTA", "group": "results", "order": 30, "auto": false, "defaultSource": "hybrid", "prompt": "Seberapa unggul/lemah dibanding baseline/SOTA." },
+    { "key": "interpretasi_hasil", "label": "Interpretasi Hasil", "group": "results", "order": 31, "auto": false, "defaultSource": "extracted", "prompt": "Makna hasil menurut penulis." },
+
+    { "key": "diskusi", "label": "Diskusi", "group": "discussion", "order": 32, "auto": false, "defaultSource": "extracted", "prompt": "Pembahasan penulis atas hasil." },
+    { "key": "implikasi", "label": "Implikasi", "group": "discussion", "order": 33, "auto": false, "defaultSource": "hybrid", "prompt": "Implikasi teoritis & praktis." },
+    { "key": "keterbatasan", "label": "Keterbatasan (Dinyatakan)", "group": "discussion", "order": 34, "auto": false, "defaultSource": "extracted", "prompt": "Limitasi yang diakui penulis." },
+    { "key": "ancaman_validitas", "label": "Ancaman terhadap Validitas", "group": "discussion", "order": 35, "auto": false, "defaultSource": "hybrid", "prompt": "Ancaman validitas internal, eksternal, konstruk, konklusi." },
+    { "key": "asumsi", "label": "Asumsi", "group": "discussion", "order": 36, "auto": false, "defaultSource": "hybrid", "prompt": "Asumsi yang mendasari metode/klaim." },
+
+    { "key": "kesimpulan", "label": "Kesimpulan", "group": "conclusion", "order": 37, "auto": false, "defaultSource": "extracted", "prompt": "Jawaban atas research question." },
+    { "key": "future_work", "label": "Future Work (Saran Penulis)", "group": "conclusion", "order": 38, "auto": false, "defaultSource": "extracted", "prompt": "Arah lanjutan yang disarankan penulis." },
+
+    { "key": "research_gap", "label": "🔬 Research Gap (Sintesis)", "group": "pdfholmes", "order": 39, "auto": false, "defaultSource": "hybrid", "featured": true, "prompt": "FIELD UNGGULAN. Gabungkan (a) gap yang dinyatakan penulis dan (b) gap yang DISIMPULKAN AI. Kategorikan tiap gap: metodologis, empiris, teoritis, kontekstual, populasi/dataset, atau generalisasi. Untuk tiap gap beri label sumber [penulis] atau [inferensi AI] dan justifikasi singkat." },
+    { "key": "peluang_riset", "label": "Peluang & Arah Riset Lanjutan", "group": "pdfholmes", "order": 40, "auto": false, "defaultSource": "inferred", "prompt": "Ide riset turunan yang konkret (calon topik tesis/paper)." },
+    { "key": "reproduktibilitas", "label": "Penilaian Reproduktibilitas", "group": "pdfholmes", "order": 41, "auto": false, "defaultSource": "inferred", "prompt": "Ketersediaan kode/data, kelengkapan detail untuk replikasi. Beri skor 0-10 + alasan." },
+    { "key": "critical_appraisal", "label": "Critical Appraisal", "group": "pdfholmes", "order": 42, "auto": false, "defaultSource": "inferred", "prompt": "Kekuatan & kelemahan, rigor metodologis." },
+    { "key": "novelty", "label": "Penilaian Kebaruan (Novelty)", "group": "pdfholmes", "order": 43, "auto": false, "defaultSource": "inferred", "prompt": "Seberapa baru relatif terhadap literatur. Beri skor 0-10 + alasan." },
+    { "key": "relevansi_pengguna", "label": "Relevansi terhadap Konteks Pengguna", "group": "pdfholmes", "order": 44, "auto": false, "defaultSource": "inferred", "optional": true, "prompt": "Jika minat riset pengguna diberikan, nilai relevansi paper terhadapnya. Jika tidak ada minat, tulis 'Tidak ada konteks pengguna'." },
+    { "key": "pertanyaan_kritis", "label": "Pertanyaan Kritis", "group": "pdfholmes", "order": 45, "auto": false, "defaultSource": "inferred", "prompt": "Daftar pertanyaan untuk journal club/diskusi/menantang klaim." },
+    { "key": "glosarium", "label": "Glosarium Istilah Kunci", "group": "pdfholmes", "order": 46, "auto": false, "defaultSource": "inferred", "prompt": "Definisi istilah teknis penting (daftar istilah: definisi)." },
+    { "key": "tldr", "label": "TL;DR + Ringkasan Awam", "group": "pdfholmes", "order": 47, "auto": false, "defaultSource": "inferred", "prompt": "TL;DR satu paragraf, lalu ringkasan awam (plain-language) untuk non-ahli." },
+    { "key": "referensi_penting", "label": "Referensi Penting untuk Ditindaklanjuti", "group": "pdfholmes", "order": 48, "auto": false, "defaultSource": "hybrid", "prompt": "Sitasi kunci dalam paper yang layak dibaca lebih lanjut, dengan alasan." }
+  ]
+}

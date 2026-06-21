@@ -1,0 +1,32 @@
+# deps
+node_modules/
+.pnpm-store/
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# build
+dist/
+.next/
+out/
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+codex-home/
+
+# data
+infra/data/
+minio_data/
+redis_data/
+caddy_data/
+
+# misc
+.DS_Store
+*.log
+coverage/
+.turbo/

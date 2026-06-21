@@ -1,0 +1,25 @@
+# Caddy reverse proxy + auto-HTTPS (§13). Ganti :80 dgn domain Anda di prod
+# (mis. pdfholmes.example.com) agar Caddy menerbitkan sertifikat TLS otomatis.
+{
+	# email admin utk Let's Encrypt (set di prod):
+	# email you@example.com
+}
+
+:80 {
+	# API -> NestJS. SSE perlu buffering dimatikan (flush_interval -1).
+	handle_path /api/* {
+		reverse_proxy api:4000 {
+			flush_interval -1
+		}
+	}
+
+	# Konsol/objek MinIO (opsional, batasi di prod).
+	handle_path /storage/* {
+		reverse_proxy minio:9000
+	}
+
+	# Sisanya -> Next.js.
+	handle {
+		reverse_proxy web:3000
+	}
+}
