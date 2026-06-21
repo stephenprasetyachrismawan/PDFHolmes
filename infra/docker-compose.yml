@@ -14,6 +14,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      # Domain dasar publik (mis. sslip.io). Dipakai Caddyfile utk vhost + auto-TLS.
+      BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -130,6 +133,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Console di belakang reverse proxy: arahkan redirect ke URL publik console.
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_CONSOLE_URL:-}
     volumes:
       - minio_data:/data
     healthcheck:
