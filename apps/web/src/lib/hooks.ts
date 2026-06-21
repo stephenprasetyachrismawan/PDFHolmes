@@ -118,13 +118,13 @@ export function useTriggerAnalyze(documentId: string) {
 
 // SSE status: dengarkan progres pipeline; refresh analysis saat ada field baru.
 export function useDocumentStatus(documentId: string) {
-  const { apiUrl } = useApi();
+  const { apiUrl, sseToken } = useApi();
   const qc = useQueryClient();
   useEffect(() => {
     if (!documentId) return;
-    const es = new EventSource(`${apiUrl}/api/events/documents/${documentId}`, {
-      withCredentials: true,
-    });
+    // EventSource tak bisa kirim header → auth lewat query param.
+    const url = `${apiUrl}/api/events/documents/${documentId}${sseToken}`;
+    const es = new EventSource(url, { withCredentials: true });
     es.onmessage = (e) => {
       try {
         const evt = JSON.parse(e.data) as StatusEvent;

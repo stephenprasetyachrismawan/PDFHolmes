@@ -11,7 +11,12 @@ import type { DbUser } from "../db/schema";
 export class JwtStrategy extends PassportStrategy(Strategy, "cognito-jwt") {
   constructor(private readonly users: UsersService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // Header Bearer (default) ATAU query ?access_token= (utk SSE EventSource,
+      // yang tak bisa kirim header kustom dari browser).
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        ExtractJwt.fromUrlQueryParameter("access_token"),
+      ]),
       ignoreExpiration: false,
       issuer: config.cognito.issuer,
       algorithms: ["RS256"],

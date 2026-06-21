@@ -40,5 +40,12 @@ export function useApi() {
     [token, devEmail],
   );
 
-  return useMemo(() => ({ request, apiUrl: API_URL }), [request]);
+  // Query string auth utk SSE EventSource (tak bisa kirim header).
+  const sseToken = DEV_BYPASS
+    ? `?x-dev-user=${encodeURIComponent(devEmail)}`
+    : token
+      ? `?access_token=${encodeURIComponent(token)}`
+      : "";
+
+  return useMemo(() => ({ request, apiUrl: API_URL, sseToken }), [request, sseToken]);
 }

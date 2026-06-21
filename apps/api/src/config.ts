@@ -1,5 +1,9 @@
 // Konfigurasi terpusat dari env. Gagal cepat bila yang wajib hilang (prod).
 export const config = {
+  nodeEnv: process.env.NODE_ENV ?? "development",
+  get isProd() {
+    return this.nodeEnv === "production";
+  },
   port: Number(process.env.API_PORT ?? 4000),
   webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
   databaseUrl: process.env.DATABASE_URL ?? "",
@@ -30,7 +34,18 @@ export const config = {
 };
 
 export function assertProdConfig() {
-  if (config.authDevBypass) return;
+  // KEAMANAN: dev-bypass DILARANG di produksi (akan membuka app tanpa auth).
+  if (config.isProd && config.authDevBypass) {
+    throw new Error("AUTH_DEV_BYPASS=true terlarang saat NODE_ENV=production");
+  }
+  // Saat prod, kunci enkripsi kredensial wajib kuat (32 byte base64).
+  if (config.isProd) {
+    const raw = process.env.CREDENTIAL_ENC_KEY ?? "";
+    if (Buffer.from(raw, "base64").length !== 32) {
+      throw new Error("CREDENTIAL_ENC_KEY wajib 32 byte base64 di produksi");
+    }
+  }
+  if (config.authDevBypass) return; // dev: lewati cek Cognito
   const missing: string[] = [];
   if (!config.databaseUrl) missing.push("DATABASE_URL");
   if (!config.cognito.jwksUrl) missing.push("COGNITO_JWKS_URL");

@@ -27,6 +27,8 @@ services:
         condition: service_healthy
 
   api:
+    environment:
+      NODE_ENV: development
     depends_on:
       - redis
       - minio

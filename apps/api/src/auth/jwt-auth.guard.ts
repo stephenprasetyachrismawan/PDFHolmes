@@ -18,7 +18,11 @@ export class JwtAuthGuard extends AuthGuard("cognito-jwt") implements CanActivat
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (config.authDevBypass) {
       const req = context.switchToHttp().getRequest();
-      const devId = (req.headers["x-dev-user"] as string) || "dev@pdfholmes.local";
+      // Header x-dev-user, atau query ?x-dev-user= (utk SSE EventSource).
+      const devId =
+        (req.headers["x-dev-user"] as string) ||
+        (req.query?.["x-dev-user"] as string) ||
+        "dev@pdfholmes.local";
       req.user = await this.users.syncFromClaims({
         sub: `dev-${devId}`,
         email: devId,

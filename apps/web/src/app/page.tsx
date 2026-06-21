@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
 
@@ -8,6 +9,15 @@ const DEV_BYPASS = process.env.NEXT_PUBLIC_AUTH_DEV_BYPASS === "true";
 export default function Home() {
   const { status } = useSession();
   const loggedIn = DEV_BYPASS || status === "authenticated";
+
+  // Diarahkan dari rute terproteksi (?signin=1) -> buka Hosted UI Cognito.
+  // Baca query via window (client-only) agar tak butuh Suspense/prerender.
+  useEffect(() => {
+    if (DEV_BYPASS || status !== "unauthenticated") return;
+    if (new URLSearchParams(window.location.search).get("signin") === "1") {
+      signIn("cognito");
+    }
+  }, [status]);
 
   return (
     <div className="mx-auto max-w-3xl py-12 text-center">

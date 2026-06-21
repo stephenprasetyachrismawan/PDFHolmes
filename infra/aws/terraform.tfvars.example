@@ -1,0 +1,14 @@
+# Salin ke terraform.tfvars lalu isi.
+region                = "ap-southeast-1"
+domain                = "pdfholmes.example.com"
+cognito_domain_prefix = "pdfholmes-app"   # harus unik global
+
+# Aurora
+aurora_min_acu = 0      # 0 = auto-pause idle (hemat). Prod aktif: 0.5
+aurora_max_acu = 2
+
+# Batasi akses DB ke CIDR host app (mis. subnet EC2). JANGAN 0.0.0.0/0 di prod.
+allowed_app_cidr = "172.31.0.0/16"
+
+# Kosongkan utk default VPC, atau isi vpc-xxxx.
+vpc_id = ""
