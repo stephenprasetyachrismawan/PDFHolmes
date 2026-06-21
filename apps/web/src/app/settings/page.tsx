@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useCredentials, useCreateCredential, useDeleteCredential } from "@/lib/hooks";
+import { CodexDeviceLogin } from "@/components/CodexDeviceLogin";
 
 type Provider = "openai" | "anthropic" | "google" | "openai_compatible" | "codex";
 
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   const [model, setModel] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [label, setLabel] = useState("");
+  const [codexPaste, setCodexPaste] = useState(false); // fallback tempel auth.json
 
   const isCodex = provider === "codex";
 
@@ -91,64 +93,84 @@ export default function SettingsPage() {
           </select>
         </label>
 
-        {isCodex && (
-          <p className="mb-3 rounded bg-amber-50 p-3 text-xs text-amber-800">
-            ⚠️ Mode Codex memakai langganan ChatGPT Anda. Ditujukan untuk pemakaian{" "}
-            <strong>personal/self-host</strong> — menyajikan layanan multi-pengguna dapat
-            melanggar ToS OpenAI (§8.3). Jalur default & aman adalah <strong>BYOK API key</strong>.
-            Tempel isi <code>~/.codex/auth.json</code> Anda di bawah.
-          </p>
-        )}
-
-        <label className="mb-3 block text-sm">
-          {isCodex ? "Isi auth.json" : "API key"}
-          <input
-            type="password"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            placeholder={isCodex ? '{"OPENAI_API_KEY":...}' : "sk-…"}
-            className="mt-1 w-full rounded border px-2 py-1.5"
-          />
-        </label>
-
+        {/* Model dipakai device-flow & manual */}
         <label className="mb-3 block text-sm">
           Model (opsional)
           <input
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder="gpt-4o-mini / claude-3-5-sonnet-latest"
+            placeholder={isCodex ? "gpt-5.1-codex" : "gpt-4o-mini / claude-3-5-sonnet-latest"}
             className="mt-1 w-full rounded border px-2 py-1.5"
           />
         </label>
 
-        {provider === "openai_compatible" && (
-          <label className="mb-3 block text-sm">
-            Base URL
-            <input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="https://openrouter.ai/api/v1"
-              className="mt-1 w-full rounded border px-2 py-1.5"
-            />
-          </label>
+        {/* Codex: device-flow login (§8.2) sebagai jalur utama */}
+        {isCodex && !codexPaste && (
+          <div className="mb-3">
+            <CodexDeviceLogin model={model || undefined} />
+            <button
+              type="button"
+              onClick={() => setCodexPaste(true)}
+              className="mt-2 text-xs text-slate-500 underline"
+            >
+              atau tempel auth.json manual
+            </button>
+          </div>
         )}
 
-        <label className="mb-4 block text-sm">
-          Label (opsional)
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            className="mt-1 w-full rounded border px-2 py-1.5"
-          />
-        </label>
+        {/* Field manual: semua provider non-codex, atau codex mode tempel */}
+        {(!isCodex || codexPaste) && (
+          <>
+            <label className="mb-3 block text-sm">
+              {isCodex ? "Isi auth.json" : "API key"}
+              <input
+                type="password"
+                value={secret}
+                onChange={(e) => setSecret(e.target.value)}
+                placeholder={isCodex ? '{"tokens":{...}}' : "sk-…"}
+                className="mt-1 w-full rounded border px-2 py-1.5"
+              />
+            </label>
 
-        <button
-          onClick={submit}
-          disabled={!secret || create.isPending}
-          className="rounded bg-brand px-4 py-2 text-white hover:bg-brand-dark disabled:opacity-60"
-        >
-          {create.isPending ? "Menyimpan…" : "Simpan (terenkripsi)"}
-        </button>
+            {provider === "openai_compatible" && (
+              <label className="mb-3 block text-sm">
+                Base URL
+                <input
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder="https://openrouter.ai/api/v1"
+                  className="mt-1 w-full rounded border px-2 py-1.5"
+                />
+              </label>
+            )}
+
+            <label className="mb-4 block text-sm">
+              Label (opsional)
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                className="mt-1 w-full rounded border px-2 py-1.5"
+              />
+            </label>
+
+            <button
+              onClick={submit}
+              disabled={!secret || create.isPending}
+              className="rounded bg-brand px-4 py-2 text-white hover:bg-brand-dark disabled:opacity-60"
+            >
+              {create.isPending ? "Menyimpan…" : "Simpan (terenkripsi)"}
+            </button>
+            {isCodex && codexPaste && (
+              <button
+                type="button"
+                onClick={() => setCodexPaste(false)}
+                className="ml-3 text-xs text-slate-500 underline"
+              >
+                kembali ke device login
+              </button>
+            )}
+          </>
+        )}
       </section>
     </div>
   );

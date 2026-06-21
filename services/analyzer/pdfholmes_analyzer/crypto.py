@@ -28,3 +28,13 @@ def decrypt(ciphertext: bytes, nonce: bytes) -> str:
     # AESGCM.decrypt menerima ct||tag, sama dgn yg ditulis api.
     plaintext = aes.decrypt(bytes(nonce), bytes(ciphertext), None)
     return plaintext.decode("utf-8")
+
+
+def encrypt(plaintext: str) -> tuple[bytes, bytes]:
+    """Cermin apps/api CryptoService.encrypt: kembalikan (ct||tag, nonce 12B)."""
+    import os
+
+    nonce = os.urandom(12)
+    aes = AESGCM(_key())
+    ct = aes.encrypt(nonce, plaintext.encode("utf-8"), None)  # ct||tag
+    return ct, nonce

@@ -19,8 +19,14 @@ DEFAULT_LANGUAGE = os.environ.get("DEFAULT_LANGUAGE", "id")
 # pengguna belum punya kredensial default.
 ANALYZER_MOCK = os.environ.get("ANALYZER_MOCK", "false").lower() == "true"
 
-# Codex (Fase 5) — stub bila nonaktif.
+# Codex (Fase 5).
 CODEX_ENABLED = os.environ.get("CODEX_ENABLED", "false").lower() == "true"
+# Device-flow login (§8.2): perintah CLI + mode mock utk uji tanpa akun ChatGPT.
+CODEX_LOGIN_CMD = os.environ.get("CODEX_LOGIN_CMD", "codex login --device-code")
+CODEX_DEVICE_MOCK = os.environ.get("CODEX_DEVICE_MOCK", "false").lower() == "true"
+CODEX_DEFAULT_MODEL = os.environ.get("CODEX_DEFAULT_MODEL", "gpt-5.1-codex")
+# Batas waktu user menyetujui device-code (detik).
+CODEX_DEVICE_TIMEOUT = int(os.environ.get("CODEX_DEVICE_TIMEOUT", "300"))
 
 # Batas panjang konteks (char) yg dikirim ke LLM per field.
 MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "24000"))

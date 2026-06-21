@@ -65,12 +65,14 @@ services:
       CREDENTIAL_ENC_KEY: ${CREDENTIAL_ENC_KEY}
       AUTH_DEV_BYPASS: ${AUTH_DEV_BYPASS:-false}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-id}
+      CODEX_AUTH_URL: ${CODEX_AUTH_URL:-http://codex-auth:8090}
     ports:
       - "4000:4000"
     depends_on:
       - redis
       - minio
       - migrate
+      - codex-auth
 
   extractor:
     build:
@@ -94,6 +96,8 @@ services:
     build:
       context: ..
       dockerfile: services/analyzer/Dockerfile
+      args:
+        INSTALL_CODEX: ${INSTALL_CODEX:-false}
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -104,6 +108,26 @@ services:
       CODEX_ENABLED: ${CODEX_ENABLED:-false}
     depends_on:
       - redis
+      - migrate
+
+  # Device-flow login Codex/ChatGPT (§8.2). Reuse image analyzer, command uvicorn.
+  # Internal-only (api memanggilnya); tak ekspos port ke host.
+  codex-auth:
+    build:
+      context: ..
+      dockerfile: services/analyzer/Dockerfile
+      args:
+        INSTALL_CODEX: ${INSTALL_CODEX:-false}
+    restart: unless-stopped
+    command: ["uvicorn", "pdfholmes_analyzer.codex_auth:app", "--host", "0.0.0.0", "--port", "8090"]
+    environment:
+      <<: *common-env
+      CREDENTIAL_ENC_KEY: ${CREDENTIAL_ENC_KEY}
+      CODEX_ENABLED: ${CODEX_ENABLED:-false}
+      CODEX_DEVICE_MOCK: ${CODEX_DEVICE_MOCK:-false}
+      CODEX_DEFAULT_MODEL: ${CODEX_DEFAULT_MODEL:-gpt-5.1-codex}
+      CODEX_LOGIN_CMD: ${CODEX_LOGIN_CMD:-codex login --device-code}
+    depends_on:
       - migrate
 
   grobid:

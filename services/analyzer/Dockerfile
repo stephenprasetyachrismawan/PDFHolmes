@@ -15,8 +15,14 @@ COPY packages/field-schema/fields.json /opt/field_schema/fields.json
 ENV PYTHONPATH=/opt/field_schema
 ENV FIELD_SCHEMA_PATH=/opt/field_schema/fields.json
 
-# (Opsional Fase 5) Codex CLI — uncomment saat siap & set CODEX_ENABLED=true:
-# RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm \
-#  && npm install -g @openai/codex && rm -rf /var/lib/apt/lists/*
+# Codex CLI (Fase 5, device-flow). Set INSTALL_CODEX=true utk login ChatGPT nyata;
+# mode mock (CODEX_DEVICE_MOCK=true) tak butuh CLI ini.
+ARG INSTALL_CODEX=false
+RUN if [ "$INSTALL_CODEX" = "true" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends nodejs npm \
+      && npm install -g @openai/codex \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
 
+# Image dipakai 2 service: worker (default) & codex-auth (override command compose).
 CMD ["python", "-m", "pdfholmes_analyzer.worker"]

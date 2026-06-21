@@ -23,6 +23,9 @@ export const config = {
   // DEV: lewati verifikasi Cognito, pakai header x-dev-user (email).
   authDevBypass: process.env.AUTH_DEV_BYPASS === "true",
 
+  // Service internal device-flow Codex (§8.2).
+  codexAuthUrl: process.env.CODEX_AUTH_URL ?? "http://codex-auth:8090",
+
   defaultLanguage: process.env.DEFAULT_LANGUAGE ?? "id",
 };
 

@@ -170,3 +170,42 @@ export function useDeleteCredential() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["credentials"] }),
   });
 }
+
+// ---- Codex device-flow (§8.2) ----
+export interface CodexDeviceStatus {
+  status: "starting" | "pending" | "complete" | "error";
+  verificationUri?: string | null;
+  userCode?: string | null;
+  error?: string | null;
+}
+
+export function useCodexDeviceStart() {
+  const { request } = useApi();
+  return useMutation({
+    mutationFn: (body: { makeDefault?: boolean; model?: string }) =>
+      request<{ sessionId: string; status: string; mock: boolean }>(
+        "/api/credentials/codex/device/start",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+  });
+}
+
+// Poll status tiap 2 dtk selama sessionId aktif; berhenti saat complete/error.
+export function useCodexDeviceStatus(sessionId: string | null) {
+  const { request } = useApi();
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: ["codex-device", sessionId],
+    enabled: !!sessionId,
+    refetchInterval: (q) => {
+      const s = q.state.data as CodexDeviceStatus | undefined;
+      if (s && (s.status === "complete" || s.status === "error")) {
+        if (s.status === "complete") qc.invalidateQueries({ queryKey: ["credentials"] });
+        return false;
+      }
+      return 2000;
+    },
+    queryFn: () =>
+      request<CodexDeviceStatus>(`/api/credentials/codex/device/status/${sessionId}`),
+  });
+}
