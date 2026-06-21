@@ -2,7 +2,7 @@ import { Inject, Injectable, MessageEvent, OnModuleInit } from "@nestjs/common";
 import { Observable, Subject, filter, map } from "rxjs";
 import Redis from "ioredis";
 import { CHANNEL_STATUS, type StatusEvent } from "@pdfholmes/shared-types";
-import { REDIS_SUB } from "../redis/redis.module";
+import { REDIS_SUB } from "../redis/redis.tokens";
 
 // Satu koneksi sub Redis -> fan-out ke banyak stream SSE via Subject.
 @Injectable()

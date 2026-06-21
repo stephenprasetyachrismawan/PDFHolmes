@@ -7,17 +7,12 @@ WORKDIR /repo
 
 # --- deps + build ---
 FROM base AS build
-COPY package.json pnpm-workspace.yaml turbo.json tsconfig.base.json ./
-COPY packages/field-schema/package.json packages/field-schema/
-COPY packages/shared-types/package.json packages/shared-types/
-COPY apps/api/package.json apps/api/
+# Salin seluruh source (node_modules/dist dikecualikan via .dockerignore).
+COPY . .
 RUN pnpm install --no-frozen-lockfile
-COPY packages ./packages
-COPY apps/api ./apps/api
-RUN pnpm --filter @pdfholmes/field-schema build \
- && pnpm --filter @pdfholmes/shared-types build \
- && pnpm --filter @pdfholmes/api build
-# Pangkas ke production deps.
+# turbo membangun dependency package (^build) lebih dulu, lalu api.
+RUN pnpm turbo run build --filter=@pdfholmes/api
+# Pangkas ke production deps + file terbangun.
 RUN pnpm --filter @pdfholmes/api --prod deploy /app
 
 # --- runtime ---

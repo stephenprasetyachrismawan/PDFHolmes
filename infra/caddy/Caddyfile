@@ -6,8 +6,9 @@
 }
 
 :80 {
-	# API -> NestJS. SSE perlu buffering dimatikan (flush_interval -1).
-	handle_path /api/* {
+	# API -> NestJS. Pakai `handle` (BUKAN handle_path) agar prefix /api
+	# tetap utuh — NestJS memakai global prefix /api. SSE: flush_interval -1.
+	handle /api/* {
 		reverse_proxy api:4000 {
 			flush_interval -1
 		}

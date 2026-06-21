@@ -147,8 +147,21 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     restart: "no"
 
+  # Portainer — UI manajemen Docker. Port 9443 (HTTPS); 9000 sengaja dihindari
+  # karena dipakai MinIO. Buka https://localhost:9443 lalu buat admin saat pertama.
+  portainer:
+    image: portainer/portainer-ce:2.21.4
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
 volumes:
   caddy_data: {}
   caddy_config: {}
   redis_data: {}
   minio_data: {}
+  portainer_data: {}

@@ -1,4 +1,4 @@
-# Build context = repo root. Next.js 15 standalone-ish (jalankan `next start`).
+# Build context = repo root. Next.js 15 (jalankan `next start`).
 FROM node:22-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -6,13 +6,9 @@ RUN corepack enable
 WORKDIR /repo
 
 FROM base AS build
-COPY package.json pnpm-workspace.yaml turbo.json tsconfig.base.json ./
-COPY packages/field-schema/package.json packages/field-schema/
-COPY packages/shared-types/package.json packages/shared-types/
-COPY apps/web/package.json apps/web/
+COPY . .
 RUN pnpm install --no-frozen-lockfile
-COPY packages ./packages
-COPY apps/web ./apps/web
+# Bangun package dependency dulu.
 RUN pnpm --filter @pdfholmes/field-schema build \
  && pnpm --filter @pdfholmes/shared-types build
 # NEXT_PUBLIC_* di-inline saat build.

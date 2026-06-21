@@ -2,9 +2,9 @@ import { Global, Module } from "@nestjs/common";
 import Redis from "ioredis";
 import { config } from "../config";
 import { QueueService } from "./queue.service";
+import { REDIS, REDIS_SUB } from "./redis.tokens";
 
-export const REDIS = Symbol("REDIS");
-export const REDIS_SUB = Symbol("REDIS_SUB");
+export { REDIS, REDIS_SUB } from "./redis.tokens";
 
 @Global()
 @Module({

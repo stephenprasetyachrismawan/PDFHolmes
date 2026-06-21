@@ -7,7 +7,7 @@ import {
   type Job,
   type StatusEvent,
 } from "@pdfholmes/shared-types";
-import { REDIS } from "./redis.module";
+import { REDIS } from "./redis.tokens";
 
 // Antrian via Redis list (LPUSH/BRPOP) — netral bahasa, dikonsumsi worker Python.
 @Injectable()
