@@ -89,7 +89,8 @@ Pilih satu panduan sesuai punya domain atau tidak:
 | Panduan | Kapan | Link |
 |---|---|---|
 | **Runbook sslip.io** | Tanpa domain — pakai `pdfholmes.<ElasticIP>.sslip.io` (paling cepat). | [`docs/RUNBOOK-sslip.md`](./docs/RUNBOOK-sslip.md) |
-| **Deploy produksi** | Punya domain sendiri. | [`docs/DEPLOY.md`](./docs/DEPLOY.md) |
+| **Deploy produksi** | Punya domain sendiri — provision Cognito + Aurora via Terraform. | [`docs/DEPLOY.md`](./docs/DEPLOY.md) |
+| **Setup Domain** | Setup DNS A-record, TLS Caddy, Cognito callback untuk domain sendiri. | [`docs/DOMAIN.md`](./docs/DOMAIN.md) |
 
 ### Ringkas alur
 
@@ -148,6 +149,7 @@ Pilih satu panduan sesuai punya domain atau tidak:
 | [`docs/COGNITO.md`](./docs/COGNITO.md) | Setup Cognito dari nol (Terraform + Console + troubleshooting) |
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Arsitektur detail: relasi Cognito/MinIO/DB/OpenCode |
 | [`docs/DEPLOY.md`](./docs/DEPLOY.md) | Deploy produksi dengan domain |
+| [`docs/DOMAIN.md`](./docs/DOMAIN.md) | Setup DNS domain sendiri (A-record, Caddy TLS, Cognito callback) |
 | [`docs/RUNBOOK-sslip.md`](./docs/RUNBOOK-sslip.md) | Deploy cepat tanpa domain (sslip.io) |
 
 ---
