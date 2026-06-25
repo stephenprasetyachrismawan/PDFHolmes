@@ -5,7 +5,6 @@ import {
   uuid,
   text,
   timestamp,
-  boolean,
   bigint,
   integer,
   jsonb,
@@ -24,7 +23,6 @@ export const aiProvider = pgEnum("ai_provider", [
   "codex",
   "opencode_go",
 ]);
-export const aiAuthType = pgEnum("ai_auth_type", ["api_key", "oauth_codex"]);
 export const docStatus = pgEnum("doc_status", [
   "uploaded",
   "extracting",
@@ -58,34 +56,6 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
-
-export const aiCredentials = pgTable(
-  "ai_credentials",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    provider: aiProvider("provider").notNull(),
-    authType: aiAuthType("auth_type").notNull(),
-    label: text("label"),
-    secretCiphertext: customType<{ data: Buffer; driverData: Buffer }>({
-      dataType() {
-        return "bytea";
-      },
-    })("secret_ciphertext").notNull(),
-    secretNonce: customType<{ data: Buffer; driverData: Buffer }>({
-      dataType() {
-        return "bytea";
-      },
-    })("secret_nonce").notNull(),
-    model: text("model"),
-    baseUrl: text("base_url"),
-    isDefault: boolean("is_default").notNull().default(false),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => ({ userIdx: index("ai_credentials_user_idx").on(t.userId) }),
-);
 
 export const folders = pgTable(
   "folders",

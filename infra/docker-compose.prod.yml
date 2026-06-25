@@ -51,9 +51,6 @@ services:
         limits:
           memory: 768m
 
-  codex-auth:
-    restart: always
-
   grobid:
     # Aktif di prod. Sediakan RAM cukup (rakus, §14).
     deploy:

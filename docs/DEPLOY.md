@@ -94,10 +94,10 @@ git clone <repo> pdfholmes && cd pdfholmes
 cp .env.prod.example .env.prod
 #   isi semua dari output Terraform/Console. WAJIB:
 #   - AUTH_DEV_BYPASS=false
-#   - CREDENTIAL_ENC_KEY  = openssl rand -base64 32
 #   - NEXTAUTH_SECRET     = openssl rand -base64 32
 #   - MINIO_ROOT_PASSWORD = password kuat (ganti default!)
 #   - DATABASE_URL        = endpoint Aurora
+#   - OPENCODE_GO_API_KEY = key langganan OpenCode Go (NON-BYOK)
 #   - BASE_DOMAIN, ACME_EMAIL
 
 # Migrasi DB (mengaktifkan extension vector/pgcrypto + buat tabel) ke Aurora:
@@ -138,12 +138,13 @@ field analisis terisi.
 
 ## 6. Checklist go-live keamanan (§16)
 - [ ] `AUTH_DEV_BYPASS=false` (api menolak boot bila true + NODE_ENV=production).
-- [ ] `CREDENTIAL_ENC_KEY` & `NEXTAUTH_SECRET` di-generate, bukan contoh.
+- [ ] `NEXTAUTH_SECRET` di-generate, bukan contoh.
+- [ ] `OPENCODE_GO_API_KEY` diisi & tak pakai prefix `NEXT_PUBLIC_` (tak bocor ke browser).
 - [ ] Kredensial MinIO default DIGANTI; console (9001) tak diekspos publik.
 - [ ] Aurora di subnet privat; SG 5432 dari EC2 saja.
 - [ ] HTTPS aktif di semua host (Caddy).
-- [ ] Rate limit AI aktif (ThrottlerModule — default 100/menit, analisis 10/menit).
-- [ ] BYOK API key = jalur default; Codex hanya personal/self-host (§8.3).
+- [ ] Rate limit AI aktif (Throttler global + per-user/global OpenCode Go via Redis).
+- [ ] AI = OpenCode Go (NON-BYOK); pengguna tak memasukkan API key.
 - [ ] Login Portainer dibuat saat pertama (admin) + password kuat.
 - [ ] Backup: snapshot Aurora otomatis; pertimbangkan replikasi MinIO ke S3.
 
@@ -155,4 +156,4 @@ field analisis terisi.
 - **Hemat biaya** (§15): stop EC2 di luar jam pakai; Aurora min ACU 0 auto-pause.
 - **Migrasi baru**: tambah file `db/migrations/000X_*.sql`, jalankan service `migrate`.
 - **Scale**: tambah replika `analyzer`/`extractor` (`--scale analyzer=2`) saat antrean menumpuk.
-- **Codex nyata**: set `INSTALL_CODEX=true`, `CODEX_ENABLED=true`, rebuild `analyzer`+`codex-auth`.
+- **AI nyata**: set `OPENCODE_GO_API_KEY=...`, `ANALYZER_MOCK=false`, lalu `up -d api analyzer`. Lihat `docs/OPENCODE.md`.

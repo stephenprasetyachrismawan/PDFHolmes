@@ -27,9 +27,6 @@ export const config = {
   // DEV: lewati verifikasi Cognito, pakai header x-dev-user (email).
   authDevBypass: process.env.AUTH_DEV_BYPASS === "true",
 
-  // Service internal device-flow Codex (§8.2).
-  codexAuthUrl: process.env.CODEX_AUTH_URL ?? "http://codex-auth:8090",
-
   defaultLanguage: process.env.DEFAULT_LANGUAGE ?? "id",
 
   // ─────────────────────────────────────────────────────────────
@@ -62,13 +59,6 @@ export function assertProdConfig() {
   // KEAMANAN: dev-bypass DILARANG di produksi (akan membuka app tanpa auth).
   if (config.isProd && config.authDevBypass) {
     throw new Error("AUTH_DEV_BYPASS=true terlarang saat NODE_ENV=production");
-  }
-  // Saat prod, kunci enkripsi kredensial wajib kuat (32 byte base64).
-  if (config.isProd) {
-    const raw = process.env.CREDENTIAL_ENC_KEY ?? "";
-    if (Buffer.from(raw, "base64").length !== 32) {
-      throw new Error("CREDENTIAL_ENC_KEY wajib 32 byte base64 di produksi");
-    }
   }
   // KEAMANAN: app NON-BYOK -> OpenCode Go API key WAJIB ada di prod.
   if (config.isProd && !config.opencode.apiKey) {

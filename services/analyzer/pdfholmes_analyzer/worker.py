@@ -79,28 +79,6 @@ def _load_extraction(conn, document_id: str) -> dict | None:
     return {"full_text": row[0], "sections": row[1] or {}, "metadata": row[2] or {}}
 
 
-def _load_default_credential(conn, user_id: str) -> dict | None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """SELECT provider, auth_type, secret_ciphertext, secret_nonce, model, base_url
-                 FROM ai_credentials
-                WHERE user_id = %s
-                ORDER BY is_default DESC, created_at ASC
-                LIMIT 1""",
-            (user_id,),
-        )
-        row = cur.fetchone()
-    if not row:
-        return None
-    return {
-        "provider": row[0],
-        "auth_type": row[1],
-        "ciphertext": bytes(row[2]),
-        "nonce": bytes(row[3]),
-        "model": row[4],
-        "base_url": row[5],
-    }
-
 
 def _load_research_interest(conn, user_id: str) -> str | None:
     with conn.cursor() as cur:
