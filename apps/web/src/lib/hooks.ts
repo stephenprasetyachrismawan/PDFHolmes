@@ -6,7 +6,6 @@ import type {
   DocumentDto,
   Folder,
   AnalysisSection,
-  AiCredentialDto,
   StatusEvent,
   DocStatus,
 } from "@pdfholmes/shared-types";
@@ -144,68 +143,21 @@ export function useDocumentStatus(documentId: string) {
   }, [documentId, apiUrl, qc]);
 }
 
-export function useCredentials() {
-  const { request } = useApi();
-  return useQuery({
-    queryKey: ["credentials"],
-    queryFn: () => request<AiCredentialDto[]>("/api/credentials"),
-  });
+// ---- AI chat (NON-BYOK) ----
+// Frontend HANYA mengirim prompt; API key OpenCode Go tetap di server.
+export interface AiChatResult {
+  ok: true;
+  model: string;
+  content: string;
 }
 
-export function useCreateCredential() {
-  const { request } = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: Record<string, unknown>) =>
-      request("/api/credentials", { method: "POST", body: JSON.stringify(body) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["credentials"] }),
-  });
-}
-
-export function useDeleteCredential() {
-  const { request } = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => request(`/api/credentials/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["credentials"] }),
-  });
-}
-
-// ---- Codex device-flow (§8.2) ----
-export interface CodexDeviceStatus {
-  status: "starting" | "pending" | "complete" | "error";
-  verificationUri?: string | null;
-  userCode?: string | null;
-  error?: string | null;
-}
-
-export function useCodexDeviceStart() {
+export function useAiChat() {
   const { request } = useApi();
   return useMutation({
-    mutationFn: (body: { makeDefault?: boolean; model?: string }) =>
-      request<{ sessionId: string; status: string; mock: boolean }>(
-        "/api/credentials/codex/device/start",
-        { method: "POST", body: JSON.stringify(body) },
-      ),
-  });
-}
-
-// Poll status tiap 2 dtk selama sessionId aktif; berhenti saat complete/error.
-export function useCodexDeviceStatus(sessionId: string | null) {
-  const { request } = useApi();
-  const qc = useQueryClient();
-  return useQuery({
-    queryKey: ["codex-device", sessionId],
-    enabled: !!sessionId,
-    refetchInterval: (q) => {
-      const s = q.state.data as CodexDeviceStatus | undefined;
-      if (s && (s.status === "complete" || s.status === "error")) {
-        if (s.status === "complete") qc.invalidateQueries({ queryKey: ["credentials"] });
-        return false;
-      }
-      return 2000;
-    },
-    queryFn: () =>
-      request<CodexDeviceStatus>(`/api/credentials/codex/device/status/${sessionId}`),
+    mutationFn: (prompt: string) =>
+      request<AiChatResult>("/api/ai/chat", {
+        method: "POST",
+        body: JSON.stringify({ prompt }),
+      }),
   });
 }

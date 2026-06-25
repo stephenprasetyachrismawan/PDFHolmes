@@ -62,17 +62,24 @@ services:
       COGNITO_JWKS_URL: ${COGNITO_JWKS_URL}
       COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID}
       COGNITO_REGION: ${COGNITO_REGION}
-      CREDENTIAL_ENC_KEY: ${CREDENTIAL_ENC_KEY}
       AUTH_DEV_BYPASS: ${AUTH_DEV_BYPASS:-false}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-id}
-      CODEX_AUTH_URL: ${CODEX_AUTH_URL:-http://codex-auth:8090}
+      # OpenCode Go (NON-BYOK) — key sisi-server saja.
+      OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY}
+      OPENCODE_GO_MODEL: ${OPENCODE_GO_MODEL:-minimax-m2.7}
+      OPENCODE_GO_PROVIDER_TYPE: ${OPENCODE_GO_PROVIDER_TYPE:-anthropic}
+      OPENCODE_GO_BASE_URL: ${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go}
+      OPENCODE_GO_MAX_TOKENS: ${OPENCODE_GO_MAX_TOKENS:-2000}
+      OPENCODE_GO_MAX_INPUT_CHARS: ${OPENCODE_GO_MAX_INPUT_CHARS:-8000}
+      OPENCODE_GO_TIMEOUT_MS: ${OPENCODE_GO_TIMEOUT_MS:-60000}
+      OPENCODE_GO_USER_RATE_PER_MIN: ${OPENCODE_GO_USER_RATE_PER_MIN:-20}
+      OPENCODE_GO_GLOBAL_RATE_PER_MIN: ${OPENCODE_GO_GLOBAL_RATE_PER_MIN:-300}
     ports:
       - "4000:4000"
     depends_on:
       - redis
       - minio
       - migrate
-      - codex-auth
 
   extractor:
     build:
@@ -96,38 +103,20 @@ services:
     build:
       context: ..
       dockerfile: services/analyzer/Dockerfile
-      args:
-        INSTALL_CODEX: ${INSTALL_CODEX:-false}
     restart: unless-stopped
     environment:
       <<: *common-env
-      CREDENTIAL_ENC_KEY: ${CREDENTIAL_ENC_KEY}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-id}
       ANALYZER_MOCK: ${ANALYZER_MOCK:-false}
-      CODEX_ENABLED: ${CODEX_ENABLED:-false}
+      # OpenCode Go (NON-BYOK) — analyzer memakai key server yang sama.
+      OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY}
+      OPENCODE_GO_MODEL: ${OPENCODE_GO_MODEL:-minimax-m2.7}
+      OPENCODE_GO_PROVIDER_TYPE: ${OPENCODE_GO_PROVIDER_TYPE:-anthropic}
+      OPENCODE_GO_BASE_URL: ${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go}
+      OPENCODE_GO_MAX_TOKENS: ${OPENCODE_GO_MAX_TOKENS:-2000}
     depends_on:
       - redis
-      - migrate
-
-  # Device-flow login Codex/ChatGPT (§8.2). Reuse image analyzer, command uvicorn.
-  # Internal-only (api memanggilnya); tak ekspos port ke host.
-  codex-auth:
-    build:
-      context: ..
-      dockerfile: services/analyzer/Dockerfile
-      args:
-        INSTALL_CODEX: ${INSTALL_CODEX:-false}
-    restart: unless-stopped
-    command: ["uvicorn", "pdfholmes_analyzer.codex_auth:app", "--host", "0.0.0.0", "--port", "8090"]
-    environment:
-      <<: *common-env
-      CREDENTIAL_ENC_KEY: ${CREDENTIAL_ENC_KEY}
-      CODEX_ENABLED: ${CODEX_ENABLED:-false}
-      CODEX_DEVICE_MOCK: ${CODEX_DEVICE_MOCK:-false}
-      CODEX_DEFAULT_MODEL: ${CODEX_DEFAULT_MODEL:-gpt-5.1-codex}
-      CODEX_LOGIN_CMD: ${CODEX_LOGIN_CMD:-codex login --device-code}
-    depends_on:
       - migrate
 
   grobid:

@@ -118,8 +118,8 @@ cp .env.prod.example .env.prod
 
 # generate rahasia:
 openssl rand -base64 32   # -> NEXTAUTH_SECRET
-openssl rand -base64 32   # -> CREDENTIAL_ENC_KEY
 openssl rand -base64 48   # -> MINIO_ROOT_PASSWORD
+# OPENCODE_GO_API_KEY = key langganan OpenCode Go (NON-BYOK)
 nano .env.prod
 ```
 Isi `.env.prod` (ganti `1.2.3.4` dgn EIP-mu):
@@ -152,17 +152,16 @@ NEXT_PUBLIC_API_URL=https://pdfholmes.1.2.3.4.sslip.io/api
 API_PORT=4000
 WEB_ORIGIN=https://pdfholmes.1.2.3.4.sslip.io
 AUTH_DEV_BYPASS=false
-CREDENTIAL_ENC_KEY=<openssl rand 32>
 
 EMBEDDING_DIM=1536
 DEFAULT_LANGUAGE=id
 ANALYZER_MOCK=false
 
-CODEX_ENABLED=false
-CODEX_DEVICE_MOCK=false
-INSTALL_CODEX=false
-CODEX_DEFAULT_MODEL=gpt-5.1-codex
-CODEX_AUTH_URL=http://codex-auth:8090
+# OpenCode Go (NON-BYOK) — penyedia AI tunggal sisi-server
+OPENCODE_GO_API_KEY=<key langganan OpenCode Go>
+OPENCODE_GO_MODEL=minimax-m2.7
+OPENCODE_GO_PROVIDER_TYPE=anthropic
+OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go
 
 BASE_DOMAIN=pdfholmes.1.2.3.4.sslip.io
 ACME_EMAIL=email-mu@contoh.com
@@ -197,10 +196,10 @@ curl https://pdfholmes.1.2.3.4.sslip.io/api/health/ready
 
 ---
 
-## 10. Hidupkan AI nyata
-Web → Pengaturan → tempel API key OpenAI/Anthropic → default. (`ANALYZER_MOCK=false` sudah.)
-Atau Codex: set `INSTALL_CODEX=true CODEX_ENABLED=true CODEX_DEVICE_MOCK=false` di `.env.prod`,
-`$PC up -d --build analyzer codex-auth`, lalu Pengaturan → Login ChatGPT.
+## 10. Hidupkan AI nyata (NON-BYOK)
+Set `OPENCODE_GO_API_KEY=...` di `.env.prod` (pastikan `ANALYZER_MOCK=false`), lalu
+`$PC up -d api analyzer`. Pengguna tak memasukkan API key apa pun — semua memakai
+langganan server. Detail: `docs/OPENCODE.md`.
 
 ---
 

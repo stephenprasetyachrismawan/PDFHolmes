@@ -13,9 +13,8 @@ export type AiProvider =
   | "anthropic"
   | "google"
   | "openai_compatible"
-  | "codex";
-
-export type AiAuthType = "api_key" | "oauth_codex";
+  | "codex"
+  | "opencode_go";
 
 export type FieldSource = "extracted" | "inferred" | "hybrid";
 
@@ -68,17 +67,6 @@ export interface Analysis {
   sections: AnalysisSection[];
   startedAt: string | null;
   finishedAt: string | null;
-}
-
-export interface AiCredentialDto {
-  id: string;
-  provider: AiProvider;
-  authType: AiAuthType;
-  label: string | null;
-  model: string | null;
-  baseUrl: string | null;
-  isDefault: boolean;
-  createdAt: string;
 }
 
 // ---- Payload job di Redis (dikonsumsi worker Python) ----
