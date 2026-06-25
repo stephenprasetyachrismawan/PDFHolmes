@@ -14,7 +14,24 @@ log = logging.getLogger("extractor")
 
 
 def db_connect() -> psycopg.Connection:
-    return psycopg.connect(config.DATABASE_URL, autocommit=False)
+    if not config.DB_IAM_AUTH:
+        return psycopg.connect(config.DATABASE_URL, autocommit=False)
+    # IAM auth: token 15-menit sbg password (dibuat per koneksi) + SSL wajib.
+    import boto3
+    from urllib.parse import unquote, urlparse
+
+    u = urlparse(config.DATABASE_URL)
+    host = u.hostname or ""
+    port = u.port or 5432
+    user = unquote(u.username or "")
+    dbname = (u.path or "/").lstrip("/")
+    token = boto3.client("rds", region_name=config.DB_IAM_REGION).generate_db_auth_token(
+        DBHostname=host, Port=port, DBUsername=user, Region=config.DB_IAM_REGION
+    )
+    return psycopg.connect(
+        host=host, port=port, user=user, dbname=dbname,
+        password=token, sslmode="require", autocommit=False,
+    )
 
 
 def redis_client() -> redis.Redis:

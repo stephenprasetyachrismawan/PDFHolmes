@@ -4,6 +4,15 @@ from __future__ import annotations
 import os
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
+# IAM auth ke RDS/Aurora (cluster free/express yg memaksa IAM). Bila true, password
+# di DATABASE_URL diabaikan; token IAM 15-menit dibuat per koneksi + SSL wajib.
+DB_IAM_AUTH = os.environ.get("DB_IAM_AUTH", "false").lower() == "true"
+DB_IAM_REGION = (
+    os.environ.get("DB_IAM_REGION")
+    or os.environ.get("AWS_REGION")
+    or os.environ.get("COGNITO_REGION")
+    or "ap-southeast-1"
+)
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 
 QUEUE_ANALYZE = "pdfholmes:queue:analyze"

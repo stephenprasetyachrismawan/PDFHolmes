@@ -6,6 +6,10 @@ name: pdfholmes
 x-common-env: &common-env
   DATABASE_URL: ${DATABASE_URL}
   REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  # IAM auth ke RDS/Aurora (opsional). true -> token IAM 15-menit per koneksi.
+  DB_IAM_AUTH: ${DB_IAM_AUTH:-false}
+  DB_IAM_REGION: ${DB_IAM_REGION:-${COGNITO_REGION:-ap-southeast-1}}
+  AWS_REGION: ${AWS_REGION:-${COGNITO_REGION:-ap-southeast-1}}
 
 services:
   proxy:
@@ -163,6 +167,9 @@ services:
       dockerfile: db/Dockerfile
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      DB_IAM_AUTH: ${DB_IAM_AUTH:-false}
+      DB_IAM_REGION: ${DB_IAM_REGION:-${COGNITO_REGION:-ap-southeast-1}}
+      AWS_REGION: ${AWS_REGION:-${COGNITO_REGION:-ap-southeast-1}}
     restart: "no"
 
   # Portainer — UI manajemen Docker. Port 9443 (HTTPS); 9000 sengaja dihindari
