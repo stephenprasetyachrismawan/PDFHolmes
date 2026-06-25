@@ -16,8 +16,27 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
+// IAM auth (RDS/Aurora yg memaksa IAM): token 15-menit sbg password + SSL.
+// Migrasi satu-kali -> cukup buat token sekali saat konek.
+const DB_IAM_AUTH = process.env.DB_IAM_AUTH === "true";
+
+async function buildClientConfig() {
+  if (!DB_IAM_AUTH) return { connectionString: DATABASE_URL };
+  const { Signer } = await import("@aws-sdk/rds-signer");
+  const u = new URL(DATABASE_URL);
+  const host = u.hostname;
+  const port = Number(u.port || 5432);
+  const user = decodeURIComponent(u.username);
+  const database = u.pathname.replace(/^\//, "");
+  const region =
+    process.env.DB_IAM_REGION ?? process.env.AWS_REGION ?? process.env.COGNITO_REGION ?? "ap-southeast-1";
+  const signer = new Signer({ hostname: host, port, username: user, region });
+  const token = await signer.getAuthToken();
+  return { host, port, user, database, password: token, ssl: { rejectUnauthorized: false } };
+}
+
 async function main() {
-  const client = new Client({ connectionString: DATABASE_URL });
+  const client = new Client(await buildClientConfig());
   await client.connect();
   try {
     await client.query(`

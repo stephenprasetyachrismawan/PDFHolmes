@@ -150,6 +150,8 @@ Pilih satu panduan sesuai punya domain atau tidak:
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Arsitektur detail: relasi Cognito/MinIO/DB/OpenCode |
 | [`docs/DEPLOY.md`](./docs/DEPLOY.md) | Deploy produksi dengan domain |
 | [`docs/DOMAIN.md`](./docs/DOMAIN.md) | Setup DNS domain sendiri (A-record, Caddy TLS, Cognito callback) |
+| [`docs/DB-LOCAL.md`](./docs/DB-LOCAL.md) | DB container Postgres di EC2 (tanpa Aurora — untuk akun AWS Free plan) |
+| [`docs/DB-AURORA-IAM.md`](./docs/DB-AURORA-IAM.md) | Aurora dgn IAM auth (cluster free/express yg memaksa IAM, `DB_IAM_AUTH=true`) |
 | [`docs/RUNBOOK-sslip.md`](./docs/RUNBOOK-sslip.md) | Deploy cepat tanpa domain (sslip.io) |
 
 ---

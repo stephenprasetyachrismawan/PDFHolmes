@@ -7,6 +7,11 @@ export const config = {
   port: Number(process.env.API_PORT ?? 4000),
   webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
   databaseUrl: process.env.DATABASE_URL ?? "",
+  // IAM auth ke RDS/Aurora (mis. cluster free/express yg memaksa IAM). Bila true,
+  // password di DATABASE_URL diabaikan; token IAM 15-menit dibuat per koneksi.
+  dbIamAuth: process.env.DB_IAM_AUTH === "true",
+  dbIamRegion:
+    process.env.DB_IAM_REGION ?? process.env.AWS_REGION ?? process.env.COGNITO_REGION ?? "ap-southeast-1",
   redisUrl: process.env.REDIS_URL ?? "redis://redis:6379",
 
   cognito: {

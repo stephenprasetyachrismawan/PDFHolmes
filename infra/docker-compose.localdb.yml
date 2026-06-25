@@ -1,0 +1,64 @@
+# Override: DB sebagai container Postgres+pgvector di host (BUKAN Aurora).
+# Untuk akun AWS Free plan / hemat biaya. Volume persisten db_data.
+# Pakai bersama base + prod:
+#   docker compose -f infra/docker-compose.yml \
+#     -f infra/docker-compose.prod.yml \
+#     -f infra/docker-compose.localdb.yml --env-file .env.prod up -d
+#
+# WAJIB di .env.prod:
+#   DATABASE_URL=postgres://app:<PWD>@db:5432/pdfholmes
+#   POSTGRES_USER=app
+#   POSTGRES_PASSWORD=<PWD kuat, sama dgn DATABASE_URL>
+#   POSTGRES_DB=pdfholmes
+# Generate PWD URL-safe: openssl rand -hex 24  (JANGAN -base64; / + = rusak URL)
+name: pdfholmes
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib diisi}
+      POSTGRES_DB: ${POSTGRES_DB:-pdfholmes}
+    # Tak ekspos 5432 ke host di prod (hanya jaringan internal compose).
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-pdfholmes}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  migrate:
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    depends_on:
+      - redis
+      - minio
+      - migrate
+      - db
+
+  extractor:
+    depends_on:
+      - redis
+      - minio
+      - grobid
+      - migrate
+      - db
+
+  analyzer:
+    depends_on:
+      - redis
+      - migrate
+      - db
+
+volumes:
+  db_data: {}

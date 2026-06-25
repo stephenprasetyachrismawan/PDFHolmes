@@ -30,15 +30,15 @@ output "cognito_hosted_ui_domain" {
 }
 
 output "aurora_endpoint" {
-  description = "Host Aurora (writer)"
-  value       = aws_rds_cluster.main.endpoint
+  description = "Host Aurora (writer). null bila enable_aurora=false."
+  value       = var.enable_aurora ? aws_rds_cluster.main[0].endpoint : null
 }
 
 output "database_secret_arn" {
-  description = "ARN Secrets Manager berisi DATABASE_URL lengkap"
-  value       = aws_secretsmanager_secret.db.arn
+  description = "ARN Secrets Manager berisi DATABASE_URL lengkap. null bila enable_aurora=false."
+  value       = var.enable_aurora ? aws_secretsmanager_secret.db[0].arn : null
 }
 
 output "aurora_security_group_id" {
-  value = aws_security_group.aurora.id
+  value = var.enable_aurora ? aws_security_group.aurora[0].id : null
 }
