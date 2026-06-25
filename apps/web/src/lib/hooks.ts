@@ -144,6 +144,25 @@ export function useDocumentStatus(documentId: string) {
   }, [documentId, apiUrl, qc]);
 }
 
+// ---- AI chat (NON-BYOK) ----
+// Frontend HANYA mengirim prompt; API key OpenCode Go tetap di server.
+export interface AiChatResult {
+  ok: true;
+  model: string;
+  content: string;
+}
+
+export function useAiChat() {
+  const { request } = useApi();
+  return useMutation({
+    mutationFn: (prompt: string) =>
+      request<AiChatResult>("/api/ai/chat", {
+        method: "POST",
+        body: JSON.stringify({ prompt }),
+      }),
+  });
+}
+
 export function useCredentials() {
   const { request } = useApi();
   return useQuery({

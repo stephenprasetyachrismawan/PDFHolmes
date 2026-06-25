@@ -13,19 +13,37 @@ Implementasi dari [`PDFHomes_Rencana_Arsitektur.md`](./PDFHomes_Rencana_Arsitekt
 | `web` | Next.js 15 + Auth.js | UI, login Cognito, PDF viewer, panel field |
 | `api` | NestJS | BFF: verifikasi JWT, CRUD, presigned URL, enqueue, SSE |
 | `extractor` | Python + PyMuPDF | PDF → teks/struktur (GROBID), simpan ke DB |
-| `analyzer` | Python + AIProvider | per-field prompt → LLM → `analysis_sections` |
+| `analyzer` | Python + OpenCode Go | per-field prompt → LLM → `analysis_sections` |
 | `grobid` | lfoppiano/grobid | PDF ilmiah → TEI XML |
 | `redis` | redis:7 | antrian job + cache |
 | `minio` | minio | object storage (bucket per-user) |
 | `proxy` | caddy:2 | TLS + routing |
 | `db` (dev) | pgvector/pgvector:pg16 | Postgres lokal (prod: Aurora) |
 
-Pipeline async: upload → `EXTRACT` → `ANALYZE` → field tersaji (status via SSE).
+Pipeline async: upload → `EXTRACT` (text parser → DB) → `ANALYZE` (OpenCode Go) → field tersaji (status via SSE).
+
+## AI: OpenCode Go (NON-BYOK)
+
+Aplikasi ini **bukan BYOK**. Pengguna **tidak** memasukkan API key sendiri.
+Seluruh app berbagi **satu** langganan OpenCode Go yang dibaca dari env server
+(`OPENCODE_GO_API_KEY`). Key hanya hidup di backend (`api` + `analyzer`) dan
+tak pernah dikirim ke browser, bundle frontend, log, atau response.
+
+- Analisis 48 field paper: extractor menyimpan hasil text parser ke DB, lalu
+  analyzer mengirim (teks hasil parser + konteks PDF) ke OpenCode Go dan menulis
+  hasilnya ke `analysis_sections` → tampil ke pengguna.
+- Asisten AI (chat): frontend hanya mengirim prompt ke `POST /api/ai/chat`;
+  backend yang memanggil OpenCode Go.
+
+Panduan langganan, copy key, `.env`, dan penjelasan kuota bersama:
+[`docs/OPENCODE.md`](./docs/OPENCODE.md).
+Cognito dari nol: [`docs/COGNITO.md`](./docs/COGNITO.md).
+Arsitektur detail (MinIO/DB/Cognito/OpenCode): [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ## Quick start (dev)
 
 ```bash
-cp .env.example .env          # isi Cognito + secret
+cp .env.example .env          # isi Cognito + OPENCODE_GO_API_KEY + secret
 pnpm install                  # deps TS (web/api/packages)
 pnpm compose:dev              # nyalakan semua service + db lokal
 # migrasi DB dijalankan otomatis oleh service `migrate`
@@ -82,8 +100,7 @@ Dua panduan langkah-demi-langkah lengkap, pilih sesuai punya domain atau tidak:
 1. Buka `https://<host>` → **Masuk** → Hosted UI Cognito → **Sign up** dengan email → konfirmasi kode verifikasi → login.
 2. **Portainer** (`https://portainer.<host>`) → buat akun admin **segera** (sebelum orang lain).
 3. **MinIO console** (`https://console.<host>`) → cek bucket/credential bila perlu.
-4. **Hidupkan AI nyata** — Web → **Pengaturan** → tempel API key OpenAI/Anthropic (BYOK, jalur default & aman). Pastikan `ANALYZER_MOCK=false`.
-   - Codex/ChatGPT subscription: set `INSTALL_CODEX=true CODEX_ENABLED=true CODEX_DEVICE_MOCK=false`, `$PC up -d --build analyzer codex-auth`, lalu Pengaturan → **Login ChatGPT** (device flow). Lihat §8.3 arsitektur.
+4. **Hidupkan AI nyata (NON-BYOK)** — set `OPENCODE_GO_API_KEY=...` di `.env.prod`, pastikan `ANALYZER_MOCK=false`, lalu `$PC up -d api analyzer`. Pengguna tak memasukkan key apa pun; semua memakai langganan server. Lihat [`docs/OPENCODE.md`](./docs/OPENCODE.md).
 5. **Pakai** — upload PDF → pipeline `EXTRACT → ANALYZE` jalan → 48 field + research gap tersaji (status live via SSE).
 
 ### Checklist go-live keamanan (§16)
@@ -93,7 +110,8 @@ Dua panduan langkah-demi-langkah lengkap, pilih sesuai punya domain atau tidak:
 - [ ] Kredensial MinIO default DIGANTI; console (9001) tak diekspos publik.
 - [ ] Aurora di subnet privat; SG 5432 dari EC2 saja.
 - [ ] HTTPS aktif di semua host (Caddy).
-- [ ] Rate limit AI aktif (Throttler — 100/menit global, analisis 10/menit).
+- [ ] Rate limit AI aktif (Throttler global + per-user/global OpenCode Go via Redis).
+- [ ] `OPENCODE_GO_API_KEY` diisi & TIDAK pakai prefix `NEXT_PUBLIC_` (tak bocor ke browser).
 - [ ] Login Portainer admin dibuat + password kuat.
 - [ ] Backup: snapshot Aurora otomatis; pertimbangkan replikasi MinIO ke S3.
 
@@ -115,6 +133,6 @@ infra/aws/               Terraform: Cognito + Aurora + Secrets Manager
 
 ## Roadmap
 
-Fase 0–4 (scaffold→analisis BYOK) fungsional. Fase 5 (Codex device-flow) ada stub provider. Fase 7 (Aurora/EC2) lihat dokumen arsitektur §12–§14 dan panduan di atas.
+Fase 0–4 (scaffold→analisis) fungsional, kini memakai OpenCode Go (NON-BYOK). Fase 7 (Aurora/EC2) lihat dokumen arsitektur dan panduan di atas.
 
-> ⚙️ Mode Codex/ChatGPT subscription: lihat §8.3 — jalur default & aman adalah **BYOK API key**.
+> ⚙️ Penyedia AI tunggal sisi-server: **OpenCode Go**. Tak ada BYOK; pengguna tak memasukkan API key. Lihat [`docs/OPENCODE.md`](./docs/OPENCODE.md).

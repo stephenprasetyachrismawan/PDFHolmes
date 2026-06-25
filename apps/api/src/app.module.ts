@@ -12,6 +12,7 @@ import { DocumentsModule } from "./documents/documents.module";
 import { AnalysesModule } from "./analyses/analyses.module";
 import { EventsModule } from "./events/events.module";
 import { CredentialsModule } from "./credentials/credentials.module";
+import { AiModule } from "./ai/ai.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -32,6 +33,7 @@ import { HealthController } from "./health.controller";
     AnalysesModule,
     EventsModule,
     CredentialsModule,
+    AiModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

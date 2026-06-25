@@ -16,8 +16,7 @@ import psycopg
 
 from . import config, context as ctxmod
 from .common import db_connect, publish_status, redis_client, set_document_status
-from .crypto import decrypt
-from .providers import AIProvider, FieldResult, MockProvider, load_provider
+from .providers import AIProvider, FieldResult, MockProvider, OpenCodeGoProvider
 
 # field-schema kanonik (dipasang via FIELD_SCHEMA_PATH + PYTHONPATH di Dockerfile).
 from field_schema import embedding_dim, fields as schema_fields  # type: ignore
@@ -147,20 +146,25 @@ def _finalize(conn, analysis_id: str, document_id: str, provider_name: str) -> N
 
 # ───────────────────────── provider selection ─────────────────────────
 def _select_provider(conn, user_id: str) -> tuple[AIProvider, str | None, str | None]:
-    """Kembalikan (provider, provider_name_for_db, model)."""
-    if config.ANALYZER_MOCK:
+    """Kembalikan (provider, provider_name_for_db, model).
+
+    NON-BYOK: pakai OpenCode Go (key dari env server) untuk SEMUA pengguna.
+    Tak ada lagi kredensial per-user. Fallback MockProvider hanya bila
+    ANALYZER_MOCK=true atau OPENCODE_GO_API_KEY belum diset.
+    """
+    if config.ANALYZER_MOCK or not config.OPENCODE_GO_API_KEY:
+        if not config.OPENCODE_GO_API_KEY:
+            log.warning("OPENCODE_GO_API_KEY kosong -> fallback MockProvider")
         return MockProvider(), None, "mock"
 
-    cred = _load_default_credential(conn, user_id)
-    if not cred:
-        log.warning("user %s tanpa kredensial AI -> fallback MockProvider", user_id)
-        return MockProvider(), None, "mock"
-
-    secret = decrypt(cred["ciphertext"], cred["nonce"])
-    provider = load_provider(
-        cred["provider"], cred["auth_type"], secret, cred["model"], cred["base_url"]
+    provider = OpenCodeGoProvider(
+        api_key=config.OPENCODE_GO_API_KEY,
+        model=config.OPENCODE_GO_MODEL,
+        base_url=config.OPENCODE_GO_BASE_URL,
+        provider_type=config.OPENCODE_GO_PROVIDER_TYPE,
+        max_tokens=config.OPENCODE_GO_MAX_TOKENS,
     )
-    return provider, cred["provider"], cred["model"]
+    return provider, "opencode_go", config.OPENCODE_GO_MODEL
 
 
 # ───────────────────────── main handler ─────────────────────────

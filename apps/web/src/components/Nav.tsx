@@ -19,6 +19,7 @@ export function Nav() {
           {loggedIn && (
             <>
               <Link href="/library" className="hover:text-brand">Pustaka</Link>
+              <Link href="/chat" className="hover:text-brand">Asisten AI</Link>
               <Link href="/settings" className="hover:text-brand">Pengaturan</Link>
             </>
           )}

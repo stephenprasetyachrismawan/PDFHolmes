@@ -16,8 +16,16 @@ EMBEDDING_DIM = int(os.environ.get("EMBEDDING_DIM", "1536"))
 DEFAULT_LANGUAGE = os.environ.get("DEFAULT_LANGUAGE", "id")
 
 # Mock: jalankan pipeline tanpa API key (demo end-to-end). Aktif bila true ATAU
-# pengguna belum punya kredensial default.
+# tak ada OpenCode Go key di server.
 ANALYZER_MOCK = os.environ.get("ANALYZER_MOCK", "false").lower() == "true"
+
+# ── OpenCode Go (penyedia AI tunggal sisi-server, NON-BYOK) ──
+# Key HANYA dari env server; tak pernah per-user, tak pernah dari browser.
+OPENCODE_GO_API_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
+OPENCODE_GO_MODEL = os.environ.get("OPENCODE_GO_MODEL", "minimax-m2.7")
+OPENCODE_GO_PROVIDER_TYPE = os.environ.get("OPENCODE_GO_PROVIDER_TYPE", "anthropic")
+OPENCODE_GO_BASE_URL = os.environ.get("OPENCODE_GO_BASE_URL", "https://opencode.ai/zen/go")
+OPENCODE_GO_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_MAX_TOKENS", "2000"))
 
 # Codex (Fase 5).
 CODEX_ENABLED = os.environ.get("CODEX_ENABLED", "false").lower() == "true"

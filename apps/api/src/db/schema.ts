@@ -22,6 +22,7 @@ export const aiProvider = pgEnum("ai_provider", [
   "google",
   "openai_compatible",
   "codex",
+  "opencode_go",
 ]);
 export const aiAuthType = pgEnum("ai_auth_type", ["api_key", "oauth_codex"]);
 export const docStatus = pgEnum("doc_status", [
@@ -174,6 +175,24 @@ export const analysisSections = pgTable(
     analysisIdx: index("analysis_sections_analysis_idx").on(t.analysisId),
     uniqField: uniqueIndex("analysis_sections_unique_field").on(t.analysisId, t.fieldKey),
   }),
+);
+
+// Metadata pemakaian AI per request (§AI keamanan). TIDAK menyimpan prompt
+// maupun API key — hanya metadata untuk audit/kuota.
+export const aiUsage = pgTable(
+  "ai_usage",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    model: text("model").notNull(),
+    inputLength: integer("input_length").notNull(),
+    status: text("status").notNull(), // ok | error | rate_limited
+    latencyMs: integer("latency_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ userIdx: index("ai_usage_user_idx").on(t.userId, t.createdAt) }),
 );
 
 export type DbUser = typeof users.$inferSelect;

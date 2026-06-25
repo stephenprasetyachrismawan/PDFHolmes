@@ -33,7 +33,7 @@ export function AnalysisPanel({
   const analyzing = docStatus === "analyzing";
   const hasSections = (analysis.data?.sections.length ?? 0) > 0;
 
-  // Belum dianalisis: tampilkan tombol trigger (Fase 4 — BYOK / mock).
+  // Belum dianalisis: tampilkan tombol trigger (analisis via OpenCode Go server).
   if (!hasSections && !analyzing) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">

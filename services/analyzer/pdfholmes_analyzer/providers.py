@@ -242,6 +242,75 @@ class CodexSubscriptionProvider:
         return None
 
 
+# ──────────────────── OpenCode Go (penyedia tunggal server, NON-BYOK) ─────────
+class OpenCodeGoProvider:
+    """Penyedia AI tunggal sisi-server lewat OpenCode Go (§AI).
+
+    NON-BYOK: API key dibaca dari env server (OPENCODE_GO_API_KEY), tak pernah
+    per-user. Routing mengikuti OPENCODE_GO_PROVIDER_TYPE:
+      anthropic -> POST {base}/v1/messages   (header anthropic-version)
+      openai    -> POST {base}/v1/chat/completions
+    Auth selalu: Authorization: Bearer <key>.
+    """
+
+    name = "opencode_go"
+
+    def __init__(self, api_key: str, model: str, base_url: str,
+                 provider_type: str = "anthropic", max_tokens: int = 2000):
+        self.api_key = api_key
+        self.model = model or "minimax-m2.7"
+        self.base_url = (base_url or "https://opencode.ai/zen/go").rstrip("/")
+        self.provider_type = (provider_type or "anthropic").lower()
+        self.max_tokens = max_tokens
+        self._client = httpx.Client(timeout=120.0)
+
+    def _user_content(self, field_key, prompt, context) -> str:
+        return (f"INSTRUKSI FIELD ({field_key}): {prompt}\n\n"
+                f"KONTEKS PAPER:\n{context}")
+
+    def analyze_field(self, field_key, prompt, context, language, default_source) -> FieldResult:
+        if self.provider_type == "openai":
+            url = f"{self.base_url}/v1/chat/completions"
+            body = {
+                "model": self.model,
+                "max_tokens": self.max_tokens,
+                "messages": [
+                    {"role": "system", "content": _system_prompt(language)},
+                    {"role": "user", "content": self._user_content(field_key, prompt, context)},
+                ],
+            }
+            headers = {"Authorization": f"Bearer {self.api_key}",
+                       "Content-Type": "application/json"}
+            r = self._client.post(url, headers=headers, json=body)
+            r.raise_for_status()
+            text = r.json()["choices"][0]["message"]["content"]
+            return _parse_result(text, default_source)
+
+        # default: anthropic-style messages
+        url = f"{self.base_url}/v1/messages"
+        body = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "system": _system_prompt(language),
+            "messages": [
+                {"role": "user", "content": self._user_content(field_key, prompt, context)},
+            ],
+        }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+        r = self._client.post(url, headers=headers, json=body)
+        r.raise_for_status()
+        text = "".join(b.get("text", "") for b in r.json().get("content", []))
+        return _parse_result(text, default_source)
+
+    def embed(self, text: str) -> list[float] | None:
+        # OpenCode Go tak menjamin endpoint embeddings; lewati (kolom nullable).
+        return None
+
+
 # ──────────────────────────────── Mock ───────────────────────────────────────
 class MockProvider:
     """Provider deterministik tanpa API — demo pipeline end-to-end tanpa kredensial."""
@@ -254,7 +323,7 @@ class MockProvider:
             f"*(Mock {language})* Analisis untuk **{field_key}**.\n\n"
             f"> Instruksi: {prompt}\n\n"
             f"Cuplikan konteks: {snippet or '(kosong)'}…\n\n"
-            f"_Aktifkan kredensial AI (BYOK) untuk hasil sungguhan._"
+            f"_Setel OPENCODE_GO_API_KEY di server untuk hasil AI sungguhan._"
         )
         return FieldResult(content_md=content, source=default_source, confidence=0.1)
 
