@@ -48,12 +48,17 @@ Ganti blok DB. **Jangan** pakai endpoint Aurora.
 ```env
 # DB container (bukan Aurora)
 POSTGRES_USER=app
-POSTGRES_PASSWORD=<password kuat — generate: openssl rand -base64 24>
+POSTGRES_PASSWORD=<password kuat — generate: openssl rand -hex 24>
 POSTGRES_DB=pdfholmes
 DATABASE_URL=postgres://app:<password kuat sama>@db:5432/pdfholmes
 ```
 `POSTGRES_PASSWORD` dan password di `DATABASE_URL` **harus sama persis**.
 Host = `db` (nama service compose), bukan `localhost`.
+
+> **Pakai `openssl rand -hex 24`** (URL-safe). JANGAN `-base64` — bisa
+> mengandung `/` `+` `=` yang merusak parsing `DATABASE_URL` (password
+> ke-truncate walau `POSTGRES_PASSWORD` benar). Bila terlanjur pakai base64,
+> percent-encode dulu sebelum menaruh di `DATABASE_URL`.
 
 Sisanya (Cognito, MinIO, OpenCode Go, dst) sama seperti `docs/DOMAIN.md`.
 

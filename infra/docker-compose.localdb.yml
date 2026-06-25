@@ -10,6 +10,7 @@
 #   POSTGRES_USER=app
 #   POSTGRES_PASSWORD=<PWD kuat, sama dgn DATABASE_URL>
 #   POSTGRES_DB=pdfholmes
+# Generate PWD URL-safe: openssl rand -hex 24  (JANGAN -base64; / + = rusak URL)
 name: pdfholmes
 
 services:
