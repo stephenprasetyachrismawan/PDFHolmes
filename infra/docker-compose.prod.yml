@@ -1,0 +1,91 @@
+# Override PRODUKSI. Pakai:
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml \
+#     --env-file .env.prod up -d
+#
+# Beda dari dev:
+#  - TANPA service `db` lokal -> DATABASE_URL menunjuk Aurora (managed AWS).
+#  - GROBID aktif (butuh instance >=8GB RAM, mis. t4g.large).
+#  - NODE_ENV=production (api menolak AUTH_DEV_BYPASS).
+#  - Resource limits + healthchecks ketat.
+#  - Console MinIO TIDAK diekspos ke host (akses via proxy bila perlu).
+name: pdfholmes
+
+services:
+  web:
+    environment:
+      NODE_ENV: production
+      AUTH_DEV_BYPASS: "false"
+    restart: always
+
+  api:
+    environment:
+      NODE_ENV: production
+      AUTH_DEV_BYPASS: "false"
+    restart: always
+    # Tak ekspos 4000 ke host di prod (hanya via proxy).
+    ports: !override []
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  extractor:
+    environment:
+      GROBID_ENABLED: "true"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+  analyzer:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+  codex-auth:
+    restart: always
+
+  grobid:
+    # Aktif di prod. Sediakan RAM cukup (rakus, §14).
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8070/api/isalive"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  redis:
+    restart: always
+
+  minio:
+    restart: always
+    # Console 9001 TIDAK diekspos ke host di prod (akses via SSH tunnel / proxy).
+    ports: !override
+      - "9000:9000"
+
+  proxy:
+    restart: always
+    # Pakai Caddyfile produksi (web di apex domain + subdomain layanan).
+    volumes:
+      - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      BASE_DOMAIN: ${BASE_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+
+  portainer:
+    restart: always

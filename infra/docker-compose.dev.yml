@@ -1,0 +1,53 @@
+# Override DEV: tambah Postgres+pgvector lokal (ganti Aurora) & buat migrate/api
+# bergantung padanya. Pakai:
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml up -d
+name: pdfholmes
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-pdfholmes}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-pdfholmes}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    environment:
+      NODE_ENV: development
+    depends_on:
+      - redis
+      - minio
+      - migrate
+      - db
+
+  extractor:
+    depends_on:
+      - redis
+      - minio
+      - grobid
+      - migrate
+      - db
+
+  analyzer:
+    depends_on:
+      - redis
+      - migrate
+      - db
+
+volumes:
+  db_data: {}

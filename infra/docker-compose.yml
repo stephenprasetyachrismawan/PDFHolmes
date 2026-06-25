@@ -1,0 +1,196 @@
+# PDFHo!mes — komposisi 9 service (§5, §13). Satu jaringan Docker (bukan
+# container-in-container). DEV: tambahkan -f docker-compose.dev.yml (service db lokal).
+# Build context tiap service = repo root (..) agar workspace pnpm & field-schema resolve.
+name: pdfholmes
+
+x-common-env: &common-env
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+
+services:
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Domain dasar publik (mis. sslip.io). Dipakai Caddyfile utk vhost + auto-TLS.
+      BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_AUTH_DEV_BYPASS: ${AUTH_DEV_BYPASS:-false}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      AUTH_DEV_BYPASS: ${AUTH_DEV_BYPASS:-false}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID}
+      COGNITO_CLIENT_SECRET: ${COGNITO_CLIENT_SECRET}
+      COGNITO_ISSUER: ${COGNITO_ISSUER}
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      API_PORT: "4000"
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      COGNITO_ISSUER: ${COGNITO_ISSUER}
+      COGNITO_JWKS_URL: ${COGNITO_JWKS_URL}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID}
+      COGNITO_REGION: ${COGNITO_REGION}
+      CREDENTIAL_ENC_KEY: ${CREDENTIAL_ENC_KEY}
+      AUTH_DEV_BYPASS: ${AUTH_DEV_BYPASS:-false}
+      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-id}
+      CODEX_AUTH_URL: ${CODEX_AUTH_URL:-http://codex-auth:8090}
+    ports:
+      - "4000:4000"
+    depends_on:
+      - redis
+      - minio
+      - migrate
+      - codex-auth
+
+  extractor:
+    build:
+      context: ..
+      dockerfile: services/extractor/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      GROBID_URL: ${GROBID_URL:-http://grobid:8070}
+      GROBID_ENABLED: ${GROBID_ENABLED:-true}
+    depends_on:
+      - redis
+      - minio
+      - grobid
+      - migrate
+
+  analyzer:
+    build:
+      context: ..
+      dockerfile: services/analyzer/Dockerfile
+      args:
+        INSTALL_CODEX: ${INSTALL_CODEX:-false}
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      CREDENTIAL_ENC_KEY: ${CREDENTIAL_ENC_KEY}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
+      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-id}
+      ANALYZER_MOCK: ${ANALYZER_MOCK:-false}
+      CODEX_ENABLED: ${CODEX_ENABLED:-false}
+    depends_on:
+      - redis
+      - migrate
+
+  # Device-flow login Codex/ChatGPT (§8.2). Reuse image analyzer, command uvicorn.
+  # Internal-only (api memanggilnya); tak ekspos port ke host.
+  codex-auth:
+    build:
+      context: ..
+      dockerfile: services/analyzer/Dockerfile
+      args:
+        INSTALL_CODEX: ${INSTALL_CODEX:-false}
+    restart: unless-stopped
+    command: ["uvicorn", "pdfholmes_analyzer.codex_auth:app", "--host", "0.0.0.0", "--port", "8090"]
+    environment:
+      <<: *common-env
+      CREDENTIAL_ENC_KEY: ${CREDENTIAL_ENC_KEY}
+      CODEX_ENABLED: ${CODEX_ENABLED:-false}
+      CODEX_DEVICE_MOCK: ${CODEX_DEVICE_MOCK:-false}
+      CODEX_DEFAULT_MODEL: ${CODEX_DEFAULT_MODEL:-gpt-5.1-codex}
+      CODEX_LOGIN_CMD: ${CODEX_LOGIN_CMD:-codex login --device-code}
+    depends_on:
+      - migrate
+
+  grobid:
+    image: lfoppiano/grobid:0.8.1
+    restart: unless-stopped
+    # GROBID rakus memori (§14). Beri ruang cukup di host kecil.
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    ports:
+      - "8070:8070"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Console di belakang reverse proxy: arahkan redirect ke URL publik console.
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_CONSOLE_URL:-}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Service satu-kali: jalankan migrasi DB lalu keluar.
+  migrate:
+    build:
+      context: ..
+      dockerfile: db/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    restart: "no"
+
+  # Portainer — UI manajemen Docker. Port 9443 (HTTPS); 9000 sengaja dihindari
+  # karena dipakai MinIO. Buka https://localhost:9443 lalu buat admin saat pertama.
+  portainer:
+    image: portainer/portainer-ce:2.21.4
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  redis_data: {}
+  minio_data: {}
+  portainer_data: {}

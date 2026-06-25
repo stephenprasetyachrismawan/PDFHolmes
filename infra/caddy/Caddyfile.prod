@@ -1,0 +1,46 @@
+# Caddy PRODUKSI — domain sungguhan + auto-HTTPS Let's Encrypt.
+# BASE_DOMAIN = host web utama (mis. pdfholmes.example.com).
+# Sub-layanan di subdomain: portainer./minio./console.<BASE_DOMAIN>.
+# Arahkan A-record domain + wildcard (atau tiap subdomain) ke IP host.
+
+{
+	# WAJIB di prod utk notifikasi & pemulihan akun Let's Encrypt:
+	email {$ACME_EMAIL}
+}
+
+# ---- Web + API (satu origin) ----
+{$BASE_DOMAIN} {
+	encode gzip zstd
+	handle /api/* {
+		reverse_proxy api:4000 {
+			flush_interval -1
+		}
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+# ---- MinIO S3 (presigned URL) ----
+minio.{$BASE_DOMAIN} {
+	reverse_proxy minio:9000
+}
+
+# ---- MinIO Console ----
+console.{$BASE_DOMAIN} {
+	reverse_proxy minio:9001
+}
+
+# ---- Portainer ----
+portainer.{$BASE_DOMAIN} {
+	reverse_proxy https://portainer:9443 {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}
