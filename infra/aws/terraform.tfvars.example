@@ -3,7 +3,9 @@ region                = "ap-southeast-1"
 domain                = "pdfholmes.example.com"
 cognito_domain_prefix = "pdfholmes-app"   # harus unik global
 
-# Aurora
+# Aurora — OPSIONAL. Default false: DB pakai container Postgres di EC2 (hemat,
+# cocok utk akun AWS Free plan yang menolak Aurora). true butuh akun Paid plan.
+enable_aurora  = false
 aurora_min_acu = 0      # 0 = auto-pause idle (hemat). Prod aktif: 0.5
 aurora_max_acu = 2
 

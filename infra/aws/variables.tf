@@ -20,6 +20,12 @@ variable "cognito_domain_prefix" {
 }
 
 # ---- Aurora ----
+variable "enable_aurora" {
+  description = "true = buat Aurora managed (butuh akun Paid plan). false = DB pakai container Postgres di EC2 (hemat, default)."
+  type        = bool
+  default     = false
+}
+
 variable "db_name" {
   type    = string
   default = "pdfholmes"
