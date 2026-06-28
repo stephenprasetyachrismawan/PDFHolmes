@@ -3,8 +3,9 @@
 # reachable dari internet untuk tantangan HTTP-01.
 #
 # Domain di-inject dari env:
-#   WEB_DOMAIN   = host web+API (satu origin), mis. pdfholmes.stevewithcode.net
-#   MINIO_DOMAIN = host MinIO S3 untuk presigned upload/download
+#   WEB_DOMAIN       = host web+API (satu origin), mis. pdfholmes.stevewithcode.net
+#   MINIO_DOMAIN     = host MinIO S3 untuk presigned upload/download
+#   PORTAINER_DOMAIN = host UI Portainer (dilindungi basic_auth)
 
 {
 	# email opsional utk notifikasi Let's Encrypt:
@@ -35,6 +36,20 @@
 }
 
 # ---- MinIO S3 API (presigned URL upload/download) ----
+# Ini API S3, BUKAN halaman UI — buka di browser akan menampilkan XML AccessDenied.
 {$MINIO_DOMAIN} {
 	reverse_proxy minio:9000
+}
+
+# ---- Portainer (UI manajemen Docker) — dilindungi basic_auth ----
+# Portainer serve HTTPS self-signed di 9443; lewati verifikasi TLS internal.
+{$PORTAINER_DOMAIN} {
+	basic_auth {
+		admin $2a$14$TGvHoz2x6rHzGuFXfkQ.Iurp063dANB.oCltwaimgJrYDF6Zai2ta
+	}
+	reverse_proxy https://portainer:9443 {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
 }

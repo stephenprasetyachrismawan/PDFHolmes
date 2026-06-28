@@ -22,6 +22,7 @@ services:
       # Domain publik dipakai Caddyfile utk vhost + auto-TLS.
       WEB_DOMAIN: ${WEB_DOMAIN:-localhost}
       MINIO_DOMAIN: ${MINIO_DOMAIN:-minio.localhost}
+      PORTAINER_DOMAIN: ${PORTAINER_DOMAIN:-portainer.localhost}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
