@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useDocuments, useFolders, useCreateFolder } from "@/lib/hooks";
+import {
+  useDocuments,
+  useFolders,
+  useCreateFolder,
+  useDeleteDocument,
+} from "@/lib/hooks";
 import { UploadButton } from "@/components/UploadButton";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -16,6 +21,7 @@ export default function LibraryPage() {
   const folders = useFolders(folderId);
   const docs = useDocuments(folderId);
   const createFolder = useCreateFolder();
+  const deleteDoc = useDeleteDocument();
 
   const openFolder = (c: Crumb) => setPath((p) => [...p, c]);
   const goTo = (index: number) => setPath((p) => p.slice(0, index)); // index=0 -> root
@@ -81,21 +87,39 @@ export default function LibraryPage() {
       ) : docs.data && docs.data.length > 0 ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {docs.data.map((d) => (
-            <Link
-              key={d.id}
-              href={`/documents/${d.id}`}
-              className="rounded-lg border bg-white p-4 transition hover:shadow"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-2xl">📄</span>
-                <StatusBadge status={d.status} />
-              </div>
-              <p className="mt-2 line-clamp-2 font-medium">{d.originalFilename}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {d.pageCount ? `${d.pageCount} hlm · ` : ""}
-                {new Date(d.createdAt).toLocaleDateString("id-ID")}
-              </p>
-            </Link>
+            <div key={d.id} className="group relative">
+              <Link
+                href={`/documents/${d.id}`}
+                className="block rounded-lg border bg-white p-4 transition hover:shadow"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-2xl">📄</span>
+                  <StatusBadge status={d.status} />
+                </div>
+                <p className="mt-2 line-clamp-2 font-medium">{d.originalFilename}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {d.pageCount ? `${d.pageCount} hlm · ` : ""}
+                  {new Date(d.createdAt).toLocaleDateString("id-ID")}
+                </p>
+              </Link>
+              <button
+                title="Hapus dokumen"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (
+                    confirm(
+                      `Hapus "${d.originalFilename}" beserta seluruh hasil analisisnya? Tindakan ini tidak bisa dibatalkan.`,
+                    )
+                  ) {
+                    deleteDoc.mutate(d.id);
+                  }
+                }}
+                disabled={deleteDoc.isPending}
+                className="absolute right-2 top-2 rounded p-1 text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 disabled:opacity-50"
+              >
+                🗑
+              </button>
+            </div>
           ))}
         </div>
       ) : (

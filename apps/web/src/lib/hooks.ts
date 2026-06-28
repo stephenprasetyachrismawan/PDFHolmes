@@ -115,6 +115,17 @@ export function useUpload(folderId: string | null) {
   return { ...mutation, progress };
 }
 
+// Hapus dokumen + semua datanya. FK ON DELETE CASCADE di DB ikut menghapus
+// extractions, analyses, dan 48 field analysis_sections; api juga hapus objek MinIO.
+export function useDeleteDocument() {
+  const { request } = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => request(`/api/documents/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["documents"] }),
+  });
+}
+
 export function useAnalysis(documentId: string) {
   const { request } = useApi();
   return useQuery({
