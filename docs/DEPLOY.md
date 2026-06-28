@@ -1,12 +1,13 @@
 # Deploy PDFHo!mes di EC2
 
 Panduan ini membangun PDFHo!mes dari nol sampai berjalan publik dengan HTTPS, login
-Cognito, dan AI OpenCode Go — semuanya sebagai container Docker di satu instance EC2.
-Database adalah Postgres dalam container (lihat [`DATABASE.md`](./DATABASE.md)).
+Cognito, dan AI OpenCode Go — service jalan sebagai container Docker di satu instance
+EC2, dengan database **Aurora PostgreSQL** (IAM auth) di luar Compose. Lihat
+[`DATABASE.md`](./DATABASE.md).
 
 Garis besar:
 1. Siapkan AWS + domain.
-2. Provision Cognito (Terraform).
+2. Provision Cognito + Aurora (Terraform).
 3. Luncurkan EC2 + Docker.
 4. Isi `.env`, jalankan stack.
 5. Arahkan DNS, Caddy menerbitkan TLS.
@@ -69,7 +70,7 @@ Isi minimal:
 # Domain (web + API satu origin)
 WEB_DOMAIN=pdfholmes.stevewithcode.net
 NEXTAUTH_URL=https://pdfholmes.stevewithcode.net
-NEXT_PUBLIC_API_URL=https://pdfholmes.stevewithcode.net/api
+NEXT_PUBLIC_API_URL=https://pdfholmes.stevewithcode.net
 WEB_ORIGIN=https://pdfholmes.stevewithcode.net
 
 # MinIO presigned (boleh subdomain lain bila DNS-nya ada;

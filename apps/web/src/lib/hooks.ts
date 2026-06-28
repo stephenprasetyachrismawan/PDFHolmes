@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   DocumentDto,
@@ -61,12 +61,38 @@ export function useViewUrl(id: string) {
   });
 }
 
-// Upload: minta presigned PUT, PUT langsung ke MinIO, konfirmasi -> pipeline jalan.
+// PUT ke MinIO via XHR supaya bisa lapor progres unggah (fetch tak punya
+// upload.onprogress). Resolve saat status 2xx.
+function putWithProgress(
+  url: string,
+  file: File,
+  onProgress: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", "application/pdf");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`upload ke storage gagal (${xhr.status})`));
+    xhr.onerror = () => reject(new Error("upload ke storage gagal"));
+    xhr.send(file);
+  });
+}
+
+// Upload: minta presigned PUT, PUT langsung ke MinIO (dgn progres), konfirmasi.
 export function useUpload(folderId: string | null) {
   const { request } = useApi();
   const qc = useQueryClient();
-  return useMutation({
+  const [progress, setProgress] = useState<number | null>(null);
+
+  const mutation = useMutation({
     mutationFn: async (file: File) => {
+      setProgress(0);
       const { document, uploadUrl } = await request<{
         document: DocumentDto;
         uploadUrl: string;
@@ -78,17 +104,15 @@ export function useUpload(folderId: string | null) {
           sizeBytes: file.size,
         }),
       });
-      const put = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": "application/pdf" },
-        body: file,
-      });
-      if (!put.ok) throw new Error("upload ke storage gagal");
+      await putWithProgress(uploadUrl, file, setProgress);
       await request(`/api/documents/${document.id}/confirm`, { method: "POST" });
       return document;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["documents", folderId] }),
+    onSettled: () => setProgress(null),
   });
+
+  return { ...mutation, progress };
 }
 
 export function useAnalysis(documentId: string) {

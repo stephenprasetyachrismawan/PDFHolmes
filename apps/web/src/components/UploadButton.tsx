@@ -25,7 +25,11 @@ export function UploadButton({ folderId }: { folderId: string | null }) {
         disabled={upload.isPending}
         className="rounded bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand-dark disabled:opacity-60"
       >
-        {upload.isPending ? "Mengunggah…" : "+ Unggah PDF"}
+        {upload.isPending
+          ? upload.progress !== null && upload.progress < 100
+            ? `Mengunggah… ${upload.progress}%`
+            : "Memproses…"
+          : "+ Unggah PDF"}
       </button>
     </>
   );

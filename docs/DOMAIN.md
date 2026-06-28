@@ -63,7 +63,7 @@ Caddy butuh port 80 reachable untuk tantangan ACME HTTP-01 agar TLS terbit otoma
 ```env
 WEB_DOMAIN=pdfholmes.stevewithcode.net
 NEXTAUTH_URL=https://pdfholmes.stevewithcode.net
-NEXT_PUBLIC_API_URL=https://pdfholmes.stevewithcode.net/api
+NEXT_PUBLIC_API_URL=https://pdfholmes.stevewithcode.net
 WEB_ORIGIN=https://pdfholmes.stevewithcode.net
 
 MINIO_DOMAIN=minio.52.74.175.80.sslip.io
