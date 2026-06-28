@@ -26,18 +26,63 @@ class FieldResult:
     confidence: float | None = None
 
 
-# Instruksi sistem: paksa output JSON terstruktur per field.
+# Batas keras panjang konten per field (karakter).
+MAX_CONTENT_CHARS = 700
+
+# Instruksi sistem: paksa output JSON terstruktur + format penulisan ketat.
 def _system_prompt(language: str) -> str:
     return (
         "Anda PDFHo!mes, asisten analisis paper ilmiah yang teliti dan jujur. "
         "Bedakan dengan tegas antara fakta yang DINYATAKAN penulis (extracted) dan "
         "INFERENSI Anda (inferred); gunakan 'hybrid' bila campuran. "
-        f"Jawab dalam bahasa: {language}. "
-        "Balas HANYA JSON valid dengan kunci: "
-        '{"content": "<markdown>", "source": "extracted|inferred|hybrid", '
-        '"confidence": <0..1>}. '
-        "Jika informasi tidak ada di teks, nyatakan itu secara eksplisit di content."
+        f"Jawab dalam bahasa: {language}.\n"
+        "ATURAN FORMAT (WAJIB, ketat):\n"
+        "- Ringkas, maksimal 100 kata. Langsung ke inti, tanpa kalimat pembuka.\n"
+        "- Satu paragraf pendek, ATAU maksimal 4 poin '- ' (bullet) singkat.\n"
+        "- DILARANG: judul/heading (#), tabel, blok kode (```), tautan, gambar, "
+        "emoji, dan kutipan panjang.\n"
+        "- Boleh **tebal** hanya untuk 1-2 istilah kunci. Tanpa daftar bertingkat.\n"
+        "- Jika informasi tidak ada di teks, tulis tepat satu kalimat: "
+        "\"Tidak dinyatakan dalam teks.\"\n"
+        "Balas HANYA JSON valid satu baris dengan kunci: "
+        '{"content": "<markdown ringkas>", "source": "extracted|inferred|hybrid", '
+        '"confidence": <0..1>}.'
     )
+
+
+# Rapikan markdown agar konsisten & ringkas: buang heading, fence, tabel; padatkan
+# baris kosong; potong ke batas keras. LLM kadang abai aturan -> ditegakkan di kode.
+def _clean_content(text: str) -> str:
+    import re
+
+    text = (text or "").strip()
+    text = text.replace("\x00", "")
+    # Buang blok kode/fence.
+    text = re.sub(r"```[a-zA-Z]*", "", text)
+    text = text.replace("```", "")
+    lines = []
+    for line in text.splitlines():
+        s = line.rstrip()
+        # Heading markdown -> jadikan teks biasa (tebalkan).
+        m = re.match(r"^\s*#{1,6}\s+(.*)$", s)
+        if m:
+            head = m.group(1).strip().rstrip("#").strip()
+            s = f"**{head}**" if head else ""
+        # Baris pemisah tabel / garis horizontal -> buang.
+        if re.match(r"^\s*\|?[\s:|-]+\|?\s*$", s) and ("|" in s or "-" in s) and len(s) > 2:
+            continue
+        # Baris data tabel (| a | b |) -> jadikan teks biasa "a · b".
+        if s.strip().startswith("|") and s.strip().endswith("|"):
+            cells = [c.strip() for c in s.strip().strip("|").split("|")]
+            s = " · ".join(c for c in cells if c)
+        lines.append(s)
+    text = "\n".join(lines)
+    # Padatkan >2 baris kosong jadi 1 baris kosong.
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    # Batas keras panjang.
+    if len(text) > MAX_CONTENT_CHARS:
+        text = text[:MAX_CONTENT_CHARS].rstrip() + "…"
+    return text
 
 
 def _parse_result(raw: str, default_source: str) -> FieldResult:
@@ -48,13 +93,13 @@ def _parse_result(raw: str, default_source: str) -> FieldResult:
     try:
         obj = json.loads(raw)
         return FieldResult(
-            content_md=str(obj.get("content", "")).strip(),
+            content_md=_clean_content(str(obj.get("content", ""))),
             source=obj.get("source", default_source) or default_source,
             confidence=_as_float(obj.get("confidence")),
         )
     except (json.JSONDecodeError, AttributeError):
-        # Fallback: pakai teks mentah sbg content.
-        return FieldResult(content_md=raw, source=default_source)
+        # Fallback: pakai teks mentah (tetap dirapikan + dipotong).
+        return FieldResult(content_md=_clean_content(raw), source=default_source)
 
 
 def _as_float(v) -> float | None:

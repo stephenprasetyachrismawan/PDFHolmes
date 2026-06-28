@@ -10,7 +10,6 @@ import { FoldersModule } from "./folders/folders.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { AnalysesModule } from "./analyses/analyses.module";
 import { EventsModule } from "./events/events.module";
-import { AiModule } from "./ai/ai.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -29,7 +28,6 @@ import { HealthController } from "./health.controller";
     DocumentsModule,
     AnalysesModule,
     EventsModule,
-    AiModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

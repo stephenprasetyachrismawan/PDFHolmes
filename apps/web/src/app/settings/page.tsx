@@ -16,8 +16,8 @@ export default function SettingsPage() {
         <h2 className="mb-2 font-medium text-emerald-800">Penyedia AI: OpenCode Go</h2>
         <p className="text-sm text-emerald-900">
           Aplikasi ini <strong>bukan BYOK</strong>. Anda tidak perlu — dan tidak
-          dapat — memasukkan API key sendiri. Semua fitur AI (analisis paper &
-          Asisten AI) memakai satu langganan OpenCode Go yang dikelola di server.
+          dapat — memasukkan API key sendiri. Analisis paper memakai satu
+          langganan OpenCode Go yang dikelola di server.
         </p>
         <p className="mt-2 text-sm text-emerald-900">
           Kuota dibagi bersama seluruh pengguna, jadi mohon gunakan secukupnya.
