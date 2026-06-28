@@ -11,6 +11,7 @@ import json
 import logging
 import signal
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import psycopg
 
@@ -166,17 +167,18 @@ def handle_analyze(conn, r, job: dict) -> None:
 
     publish_status(r, document_id, "analyzing")
 
-    # Per-field (§6): prompt -> LLM -> JSON -> simpan -> stream status.
-    for field in schema_fields():
-        prompt = field.prompt
+    # Panggilan LLM per-field dijalankan PARALEL (dulu 48 berurutan = sangat lambat).
+    # httpx.Client thread-safe -> aman dipakai banyak thread. Penyimpanan DB & publish
+    # status tetap di main thread (psycopg tidak thread-safe), dilakukan saat tiap
+    # future selesai supaya status tetap streaming.
+    def _run_field(field) -> tuple[object, FieldResult]:
         ctx = base_context
         # Field relevansi pengguna: sertakan minat riset bila ada.
         if field.key == "relevansi_pengguna" and research_interest:
             ctx = f"MINAT RISET PENGGUNA: {research_interest}\n\n{ctx}"
-
         try:
             result = provider.analyze_field(
-                field.key, prompt, ctx, language, field.default_source
+                field.key, field.prompt, ctx, language, field.default_source
             )
         except Exception as exc:  # noqa: BLE001 — satu field gagal jangan gagalkan semua
             log.warning("field %s gagal: %s", field.key, exc)
@@ -184,16 +186,21 @@ def handle_analyze(conn, r, job: dict) -> None:
                 content_md=f"_Gagal menganalisis field ini: {str(exc)[:200]}_",
                 source=field.default_source,
             )
+        return field, result
 
-        embedding = None
-        if result.content_md:
-            try:
-                embedding = provider.embed(result.content_md)
-            except Exception as exc:  # noqa: BLE001
-                log.debug("embed %s gagal: %s", field.key, exc)
-
-        _save_section(conn, analysis_id, field, result, embedding)
-        publish_status(r, document_id, "analyzing", field_key=field.key)
+    fields = schema_fields()
+    with ThreadPoolExecutor(max_workers=config.ANALYZE_CONCURRENCY) as pool:
+        futures = [pool.submit(_run_field, f) for f in fields]
+        for fut in as_completed(futures):
+            field, result = fut.result()
+            embedding = None
+            if result.content_md:
+                try:
+                    embedding = provider.embed(result.content_md)
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("embed %s gagal: %s", field.key, exc)
+            _save_section(conn, analysis_id, field, result, embedding)
+            publish_status(r, document_id, "analyzing", field_key=field.key)
 
     _finalize(conn, analysis_id, document_id, provider.name)
     publish_status(r, document_id, "analyzed")

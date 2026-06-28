@@ -114,6 +114,8 @@ services:
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-id}
       ANALYZER_MOCK: ${ANALYZER_MOCK:-false}
+      # Field dianalisis paralel (mempercepat; turunkan bila kena rate limit).
+      ANALYZE_CONCURRENCY: ${ANALYZE_CONCURRENCY:-8}
       # OpenCode Go (NON-BYOK) — analyzer memakai key server yang sama.
       OPENCODE_GO_API_KEY: ${OPENCODE_GO_API_KEY}
       OPENCODE_GO_MODEL: ${OPENCODE_GO_MODEL:-minimax-m2.7}

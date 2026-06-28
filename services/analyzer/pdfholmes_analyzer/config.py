@@ -36,4 +36,9 @@ OPENCODE_GO_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_MAX_TOKENS", "2000"))
 # Batas panjang konteks (char) yg dikirim ke LLM per field.
 MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "24000"))
 
+# Jumlah field yg dianalisis paralel (48 panggilan LLM jadi N-paralel, bukan
+# berurutan). Mempercepat analisis dramatis. Naikkan hati-hati: dibatasi rate
+# limit penyedia. httpx.Client thread-safe; penyimpanan DB tetap di main thread.
+ANALYZE_CONCURRENCY = int(os.environ.get("ANALYZE_CONCURRENCY", "8"))
+
 ANALYZER_VERSION = "analyzer-0.1.0"
