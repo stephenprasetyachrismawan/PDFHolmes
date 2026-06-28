@@ -109,11 +109,77 @@ def _as_float(v) -> float | None:
         return None
 
 
+# ───────────── Mode BATCH: 1 panggilan utk SEMUA field ─────────────
+def _batch_system_prompt(language: str) -> str:
+    return (
+        "Anda PDFHo!mes, asisten analisis paper ilmiah yang teliti dan jujur. "
+        "Anda menganalisis SATU paper dan mengisi BANYAK field sekaligus. "
+        "Bedakan fakta yang DINYATAKAN penulis (extracted) dari INFERENSI Anda "
+        "(inferred); 'hybrid' bila campuran. "
+        f"Jawab dalam bahasa: {language}.\n"
+        "ATURAN FORMAT tiap content (WAJIB, ketat):\n"
+        "- Ringkas, maksimal 100 kata. Langsung ke inti, tanpa pembuka.\n"
+        "- Satu paragraf pendek ATAU maksimal 4 poin '- ' singkat.\n"
+        "- DILARANG: heading (#), tabel, blok kode (```), tautan, gambar, emoji.\n"
+        "- Boleh **tebal** untuk 1-2 istilah kunci. Tanpa daftar bertingkat.\n"
+        "- Jika info tak ada di teks: tepat satu kalimat \"Tidak dinyatakan dalam teks.\"\n"
+        "Balas HANYA satu objek JSON valid. Kunci = key field. Nilai tiap key = "
+        '{"content":"<markdown ringkas>","source":"extracted|inferred|hybrid",'
+        '"confidence":<0..1>}. Wajib sertakan SEMUA key yang diminta, tanpa teks lain.'
+    )
+
+
+def _batch_user_prompt(fields, context) -> str:
+    lines = ["DAFTAR FIELD (isi semua, pakai key persis sebagai kunci JSON):"]
+    for f in fields:
+        lines.append(f"- {f.key}: {f.prompt}")
+    return "\n".join(lines) + f"\n\nKONTEKS PAPER:\n{context}"
+
+
+def _extract_json_object(raw: str) -> str:
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1].lstrip("json").strip() if "```" in raw[3:] else raw.strip("`")
+    # Ambil dari '{' pertama sampai '}' terakhir (tahan teks pembungkus / sebagian).
+    i, j = raw.find("{"), raw.rfind("}")
+    return raw[i : j + 1] if i != -1 and j > i else raw
+
+
+def _parse_batch(raw: str, fields) -> dict:
+    """Pisah satu JSON jadi {field_key: FieldResult}. Field hilang -> fallback."""
+    obj = {}
+    try:
+        obj = json.loads(_extract_json_object(raw))
+        if not isinstance(obj, dict):
+            obj = {}
+    except json.JSONDecodeError:
+        obj = {}
+    results: dict = {}
+    for f in fields:
+        item = obj.get(f.key)
+        if isinstance(item, dict) and str(item.get("content", "")).strip():
+            results[f.key] = FieldResult(
+                content_md=_clean_content(str(item.get("content", ""))),
+                source=item.get("source", f.default_source) or f.default_source,
+                confidence=_as_float(item.get("confidence")),
+            )
+        elif isinstance(item, str) and item.strip():
+            results[f.key] = FieldResult(content_md=_clean_content(item), source=f.default_source)
+        else:
+            results[f.key] = FieldResult(
+                content_md="Tidak dinyatakan dalam teks.", source=f.default_source
+            )
+    return results
+
+
 class AIProvider(Protocol):
     name: str
 
     def analyze_field(self, field_key: str, prompt: str, context: str,
                       language: str, default_source: str) -> FieldResult: ...
+
+    def analyze_batch(self, fields, context: str, language: str,
+                      max_tokens: int) -> dict: ...
 
     def embed(self, text: str) -> list[float] | None: ...
 
@@ -144,36 +210,32 @@ class OpenCodeGoProvider:
         return (f"INSTRUKSI FIELD ({field_key}): {prompt}\n\n"
                 f"KONTEKS PAPER:\n{context}")
 
-    def analyze_field(self, field_key, prompt, context, language, default_source) -> FieldResult:
+    # Satu panggilan chat mentah (routing anthropic/openai), kembalikan teks.
+    def _raw_chat(self, system: str, user: str, max_tokens: int) -> str:
         if self.provider_type == "openai":
             url = f"{self.base_url}/v1/chat/completions"
             body = {
                 "model": self.model,
-                "max_tokens": self.max_tokens,
+                "max_tokens": max_tokens,
                 "messages": [
-                    {"role": "system", "content": _system_prompt(language)},
-                    {"role": "user", "content": self._user_content(field_key, prompt, context)},
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
                 ],
             }
             headers = {"Authorization": f"Bearer {self.api_key}",
                        "Content-Type": "application/json"}
             r = self._client.post(url, headers=headers, json=body)
             r.raise_for_status()
-            text = r.json()["choices"][0]["message"]["content"]
-            return _parse_result(text, default_source)
+            return r.json()["choices"][0]["message"]["content"]
 
-        # default: anthropic-style messages
+        # default: anthropic-style messages. Header x-api-key (BUKAN Bearer).
         url = f"{self.base_url}/v1/messages"
         body = {
             "model": self.model,
-            "max_tokens": self.max_tokens,
-            "system": _system_prompt(language),
-            "messages": [
-                {"role": "user", "content": self._user_content(field_key, prompt, context)},
-            ],
+            "max_tokens": max_tokens,
+            "system": system,
+            "messages": [{"role": "user", "content": user}],
         }
-        # Protokol Anthropic pakai header x-api-key (BUKAN Authorization: Bearer),
-        # kalau tidak server balas 401 "Missing API key."
         headers = {
             "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01",
@@ -181,8 +243,22 @@ class OpenCodeGoProvider:
         }
         r = self._client.post(url, headers=headers, json=body)
         r.raise_for_status()
-        text = "".join(b.get("text", "") for b in r.json().get("content", []))
+        return "".join(b.get("text", "") for b in r.json().get("content", []))
+
+    def analyze_field(self, field_key, prompt, context, language, default_source) -> FieldResult:
+        text = self._raw_chat(
+            _system_prompt(language), self._user_content(field_key, prompt, context),
+            self.max_tokens,
+        )
         return _parse_result(text, default_source)
+
+    # SATU panggilan untuk SEMUA field: AI balas satu JSON {key: {content,...}},
+    # sistem memisah & menyimpan per field. Jauh lebih cepat dari 48 panggilan.
+    def analyze_batch(self, fields, context, language, max_tokens) -> dict:
+        text = self._raw_chat(
+            _batch_system_prompt(language), _batch_user_prompt(fields, context), max_tokens,
+        )
+        return _parse_batch(text, fields)
 
     def embed(self, text: str) -> list[float] | None:
         # OpenCode Go tak menjamin endpoint embeddings; lewati (kolom nullable).
@@ -204,6 +280,12 @@ class MockProvider:
             f"_Setel OPENCODE_GO_API_KEY di server untuk hasil AI sungguhan._"
         )
         return FieldResult(content_md=content, source=default_source, confidence=0.1)
+
+    def analyze_batch(self, fields, context, language, max_tokens) -> dict:
+        return {
+            f.key: self.analyze_field(f.key, f.prompt, context, language, f.default_source)
+            for f in fields
+        }
 
     def embed(self, text: str) -> list[float] | None:
         return None  # tak ada embedding di mode mock
