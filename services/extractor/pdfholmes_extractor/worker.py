@@ -172,6 +172,13 @@ def main() -> None:
             handle_extract(conn, mc, r, job)
         except Exception as exc:  # noqa: BLE001 — worker tahan-gagal
             log.exception("job gagal: %s", exc)
+            # Rollback: error query meninggalkan transaksi 'aborted' -> tanpa ini
+            # koneksi keracunan & job berikutnya gagal beruntun.
+            try:
+                if not conn.closed:
+                    conn.rollback()
+            except Exception:
+                conn = db_connect()
             doc_id = None
             try:
                 doc_id = json.loads(raw).get("documentId")

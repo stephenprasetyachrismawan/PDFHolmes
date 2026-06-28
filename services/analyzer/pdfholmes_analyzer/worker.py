@@ -227,6 +227,13 @@ def main() -> None:
             handle_analyze(conn, r, json.loads(raw))
         except Exception as exc:  # noqa: BLE001
             log.exception("job analyze gagal: %s", exc)
+            # WAJIB rollback: error query meninggalkan transaksi 'aborted' -> tanpa
+            # ini koneksi keracunan & SEMUA job berikutnya gagal beruntun.
+            try:
+                if not conn.closed:
+                    conn.rollback()
+            except Exception:
+                conn = db_connect()
             try:
                 doc_id = json.loads(raw).get("documentId")
                 if doc_id:

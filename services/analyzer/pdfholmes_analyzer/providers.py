@@ -145,30 +145,75 @@ def _extract_json_object(raw: str) -> str:
     return raw[i : j + 1] if i != -1 and j > i else raw
 
 
+def _salvage_field(raw: str, key: str):
+    """Ambil objek satu field "key": { ... } dari JSON yang mungkin terpotong.
+    Brace-balancing sederhana (sadar string + escape) -> tahan output terpotong di
+    tengah, sehingga truncation hanya kehilangan field ekor, BUKAN semuanya."""
+    import re
+
+    m = re.search(r'"' + re.escape(key) + r'"\s*:\s*\{', raw)
+    if not m:
+        return None
+    start = m.end() - 1  # posisi '{'
+    depth = 0
+    in_str = False
+    esc = False
+    for j in range(start, len(raw)):
+        c = raw[j]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(raw[start : j + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None  # terpotong sebelum objek selesai
+
+
+def _to_result(item, default_source: str):
+    if isinstance(item, dict) and str(item.get("content", "")).strip():
+        return FieldResult(
+            content_md=_clean_content(str(item.get("content", ""))),
+            source=item.get("source", default_source) or default_source,
+            confidence=_as_float(item.get("confidence")),
+        )
+    if isinstance(item, str) and item.strip():
+        return FieldResult(content_md=_clean_content(item), source=default_source)
+    return None
+
+
 def _parse_batch(raw: str, fields) -> dict:
-    """Pisah satu JSON jadi {field_key: FieldResult}. Field hilang -> fallback."""
+    """Pisah satu JSON jadi {field_key: FieldResult}. Toleran JSON terpotong:
+    coba parse penuh dulu, lalu salvage per-key utk yang hilang. Field yang benar2
+    tak ada -> fallback 'Tidak dinyatakan'."""
     obj = {}
     try:
-        obj = json.loads(_extract_json_object(raw))
-        if not isinstance(obj, dict):
-            obj = {}
+        parsed = json.loads(_extract_json_object(raw))
+        if isinstance(parsed, dict):
+            obj = parsed
     except json.JSONDecodeError:
         obj = {}
+
     results: dict = {}
     for f in fields:
-        item = obj.get(f.key)
-        if isinstance(item, dict) and str(item.get("content", "")).strip():
-            results[f.key] = FieldResult(
-                content_md=_clean_content(str(item.get("content", ""))),
-                source=item.get("source", f.default_source) or f.default_source,
-                confidence=_as_float(item.get("confidence")),
-            )
-        elif isinstance(item, str) and item.strip():
-            results[f.key] = FieldResult(content_md=_clean_content(item), source=f.default_source)
-        else:
-            results[f.key] = FieldResult(
-                content_md="Tidak dinyatakan dalam teks.", source=f.default_source
-            )
+        res = _to_result(obj.get(f.key), f.default_source)
+        if res is None:  # hilang / kosong -> coba salvage dari teks mentah
+            res = _to_result(_salvage_field(raw, f.key), f.default_source)
+        results[f.key] = res or FieldResult(
+            content_md="Tidak dinyatakan dalam teks.", source=f.default_source
+        )
     return results
 
 

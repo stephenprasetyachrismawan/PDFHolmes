@@ -33,7 +33,7 @@ OPENCODE_GO_PROVIDER_TYPE = os.environ.get("OPENCODE_GO_PROVIDER_TYPE", "anthrop
 OPENCODE_GO_BASE_URL = os.environ.get("OPENCODE_GO_BASE_URL", "https://opencode.ai/zen/go")
 OPENCODE_GO_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_MAX_TOKENS", "2000"))
 # Mode BATCH: 1 panggilan utk SEMUA field (48) -> butuh output besar.
-OPENCODE_GO_BATCH_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_BATCH_MAX_TOKENS", "8000"))
+OPENCODE_GO_BATCH_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_BATCH_MAX_TOKENS", "16000"))
 
 # Batas panjang konteks (char) yg dikirim ke LLM per field.
 MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "24000"))
