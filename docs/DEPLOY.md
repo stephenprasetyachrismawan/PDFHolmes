@@ -1,159 +1,159 @@
-# PDFHo!mes — Panduan Deploy Produksi (Aurora + Cognito + EC2)
+# Deploy PDFHo!mes di EC2
 
-Fase 7 arsitektur (§11–16). Hasil akhir: app publik HTTPS, identitas Cognito,
-database Aurora, worker AI berjalan di 1 EC2 (Docker Compose).
+Panduan ini membangun PDFHo!mes dari nol sampai berjalan publik dengan HTTPS, login
+Cognito, dan AI OpenCode Go — semuanya sebagai container Docker di satu instance EC2.
+Database adalah Postgres dalam container (lihat [`DATABASE.md`](./DATABASE.md)).
 
-Ringkas alur:
-1. Provision **Cognito** + **Aurora** (Terraform atau Console).
-2. Luncurkan **EC2** + Docker.
-3. Isi `.env.prod`, jalankan migrasi, `compose up`.
-4. Arahkan domain, Caddy terbitkan TLS.
-5. Hardening (§16) + cek go-live.
-
----
-
-## 0. Prasyarat
-- Akun AWS + kredensial (`aws configure`).
-- Domain (mis. `pdfholmes.example.com`) yang bisa diatur DNS-nya.
-- Terraform ≥ 1.6 (opsi A) **atau** akses Console (opsi B).
+Garis besar:
+1. Siapkan AWS + domain.
+2. Provision Cognito (Terraform).
+3. Luncurkan EC2 + Docker.
+4. Isi `.env`, jalankan stack.
+5. Arahkan DNS, Caddy menerbitkan TLS.
+6. Cek go-live.
 
 ---
 
-## 1A. Provision via Terraform (disarankan)
+## 1. Prasyarat
+
+- Akun AWS + kredensial (`aws configure`; cek `aws sts get-caller-identity`).
+- Domain yang DNS-nya bisa Anda atur (contoh: `pdfholmes.stevewithcode.net`).
+- Langganan OpenCode Go + API key (lihat [`OPENCODE.md`](./OPENCODE.md)).
+- Terraform ≥ 1.6.
+
+---
+
+## 2. Provision Cognito
 
 ```bash
 cd infra/aws
-cp terraform.tfvars.example terraform.tfvars
-#   isi: region, domain, cognito_domain_prefix (unik global),
-#        allowed_app_cidr (CIDR subnet EC2), vpc_id (kosong=default VPC)
+cp terraform.tfvars.example terraform.tfvars   # isi domain, cognito_domain_prefix, region
 terraform init && terraform apply
 ```
 
-Ambil output → ini langsung jadi nilai `.env.prod`:
-
-| Terraform output | Variabel `.env.prod` |
-|---|---|
-| `cognito_issuer` | `COGNITO_ISSUER` |
-| `cognito_jwks_url` | `COGNITO_JWKS_URL` |
-| `cognito_user_pool_id` | `COGNITO_USER_POOL_ID` |
-| `cognito_client_id` | `COGNITO_CLIENT_ID` |
-| `cognito_client_secret` (`-raw`) | `COGNITO_CLIENT_SECRET` |
-| `aurora_endpoint` | host di `DATABASE_URL` |
-| `database_secret_arn` | berisi `DATABASE_URL` lengkap |
-
-```bash
-# DATABASE_URL lengkap (user+password+host) ada di Secrets Manager:
-aws secretsmanager get-secret-value \
-  --secret-id pdfholmes/aurora/credentials \
-  --query SecretString --output text | jq -r .url
-```
+Ambil outputnya untuk `.env` (issuer, jwks_url, client_id, client_secret,
+user_pool_id). Langkah lengkap + pemetaan env: [`COGNITO.md`](./COGNITO.md).
 
 ---
 
-## 1B. Provision via Console (alternatif manual)
+## 3. EC2 + Docker
 
-### Cognito (§11)
-1. **Cognito → Create user pool**, tier **Essentials**.
-2. Sign-in option = **Email**; aktifkan **verifikasi email**.
-3. Password policy sesuai kebutuhan; MFA = optional (TOTP).
-4. **App client** (SPA/public-confidential): aktifkan **Authorization code grant**,
-   scope `openid email profile`.
-   - Callback URL: `https://pdfholmes.example.com/api/auth/callback/cognito`
-   - Sign-out URL: `https://pdfholmes.example.com`
-   - Generate **client secret** (Auth.js memakainya).
-5. **Hosted UI domain**: set prefix unik.
-6. Catat: User Pool ID, Client ID, Client secret, region.
-   - `COGNITO_ISSUER = https://cognito-idp.<region>.amazonaws.com/<userPoolId>`
-   - `COGNITO_JWKS_URL = <issuer>/.well-known/jwks.json`
-
-### Aurora (§12)
-1. **RDS → Create database → Aurora (PostgreSQL)**, versi **16.x** (dukung scale-to-zero).
-2. **Serverless v2**: **Min ACU = 0** (auto-pause idle) / **Max ACU = 2**.
-   - Prod dgn user aktif: Min ACU **0.5** agar hangat (hindari cold start ±15s).
-3. Enkripsi at rest (default KMS) **on**.
-4. Jaringan: **subnet privat**; Security Group izinkan **5432 hanya dari SG/CIDR EC2**. Jangan publik.
-5. Buat DB `pdfholmes`. Simpan kredensial di **Secrets Manager**.
-
----
-
-## 2. EC2 + Docker (§14)
-1. Luncurkan EC2 **Graviton** (`t4g.large` 8GB jika GROBID aktif; `t4g.medium` tanpa GROBID).
-2. EBS gp3 ~30GB. Security Group: **80/443 publik**, **22 hanya IP Anda**.
-3. Pasang Docker + plugin compose:
+1. Luncurkan EC2 **Graviton** (`t4g.medium`/`t4g.large`) dengan **Elastic IP** agar
+   IP tetap.
+2. EBS gp3 ~40GB.
+3. Security Group: **80/443 publik**, **22 hanya IP Anda**.
+4. Pasang Docker:
    ```bash
    sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
    sudo systemctl enable --now docker && sudo usermod -aG docker $USER
    ```
-4. Pastikan EC2 berada di VPC/subnet yang SG-nya diizinkan Aurora (langkah 1).
 
 ---
 
-## 3. Konfigurasi + migrasi
+## 4. Konfigurasi `.env`
+
 ```bash
 git clone <repo> pdfholmes && cd pdfholmes
-cp .env.prod.example .env.prod
-#   isi semua dari output Terraform/Console. WAJIB:
-#   - AUTH_DEV_BYPASS=false
-#   - NEXTAUTH_SECRET     = openssl rand -base64 32
-#   - MINIO_ROOT_PASSWORD = password kuat (ganti default!)
-#   - DATABASE_URL        = endpoint Aurora
-#   - OPENCODE_GO_API_KEY = key langganan OpenCode Go (NON-BYOK)
-#   - BASE_DOMAIN, ACME_EMAIL
-
-# Migrasi DB (mengaktifkan extension vector/pgcrypto + buat tabel) ke Aurora:
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml \
-  --env-file .env.prod run --rm --build migrate
+cp .env.example .env
 ```
 
-> Jika `CREATE EXTENSION vector` gagal: pastikan versi Aurora 16.x (pgvector tersedia)
-> dan user punya hak. Bisa juga jalankan `CREATE EXTENSION vector;` manual via psql.
+Isi minimal:
+
+```env
+# Domain (web + API satu origin)
+WEB_DOMAIN=pdfholmes.stevewithcode.net
+NEXTAUTH_URL=https://pdfholmes.stevewithcode.net
+NEXT_PUBLIC_API_URL=https://pdfholmes.stevewithcode.net/api
+WEB_ORIGIN=https://pdfholmes.stevewithcode.net
+
+# MinIO presigned (boleh subdomain lain bila DNS-nya ada;
+# sslip.io memetakan IP→hostname tanpa perlu set DNS)
+MINIO_DOMAIN=minio.<elastic-ip>.sslip.io
+MINIO_PUBLIC_ENDPOINT=https://minio.<elastic-ip>.sslip.io
+MINIO_ROOT_USER=<ganti>
+MINIO_ROOT_PASSWORD=<password kuat>
+
+# Login Cognito (dari output Terraform) — TANPA bypass
+AUTH_DEV_BYPASS=false
+NEXTAUTH_SECRET=<openssl rand -base64 32>
+COGNITO_REGION=ap-southeast-1
+COGNITO_USER_POOL_ID=...
+COGNITO_CLIENT_ID=...
+COGNITO_CLIENT_SECRET=...
+COGNITO_ISSUER=...
+COGNITO_JWKS_URL=...
+
+# Database container (lihat DATABASE.md)
+POSTGRES_USER=app
+POSTGRES_PASSWORD=<openssl rand -hex 24>
+POSTGRES_DB=pdfholmes
+DATABASE_URL=postgres://app:<password sama>@db:5432/pdfholmes
+
+# AI (lihat OPENCODE.md)
+OPENCODE_GO_API_KEY=sk-...
+```
 
 ---
 
-## 4. Build + jalankan
+## 5. Jalankan
+
 ```bash
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml \
-  --env-file .env.prod up -d --build
+docker compose \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.dev.yml \
+  --env-file .env up -d
 ```
 
-### DNS
-Arahkan A-record ke IP EC2:
-- `pdfholmes.example.com` → web
-- `minio.pdfholmes.example.com`, `console.pdfholmes.example.com`, `portainer.pdfholmes.example.com`
-
-(atau wildcard `*.pdfholmes.example.com`). Caddy otomatis terbitkan TLS (port 80 harus
-reachable utk tantangan HTTP-01).
+File compose kedua menambahkan service `db` (Postgres + pgvector). Service `migrate`
+membuat tabel + ekstensi otomatis sebelum `api` mulai.
 
 ---
 
-## 5. Verifikasi
+## 6. DNS + TLS
+
+Arahkan A-record domain ke Elastic IP EC2:
+
+| Type | Name | Value |
+|---|---|---|
+| A | `pdfholmes` | `<elastic-ip>` |
+
+MinIO memakai host `sslip.io` yang resolve otomatis ke IP (tanpa DNS manual). Caddy
+menerbitkan sertifikat Let's Encrypt sendiri — port 80 harus reachable untuk
+tantangan HTTP-01. Detail DNS: [`DOMAIN.md`](./DOMAIN.md).
+
+---
+
+## 7. Verifikasi
+
 ```bash
-curl https://pdfholmes.example.com/api/health        # {"status":"ok"}
-curl https://pdfholmes.example.com/api/health/ready   # db+redis ok
+curl https://pdfholmes.stevewithcode.net/api/health         # {"status":"ok"}
+curl https://pdfholmes.stevewithcode.net/api/health/ready   # db + redis ok
 ```
-Buka `https://pdfholmes.example.com` → login Cognito (Hosted UI) → upload PDF →
-field analisis terisi.
+
+Buka `https://pdfholmes.stevewithcode.net` → login Cognito → unggah PDF → field
+analisis terisi.
 
 ---
 
-## 6. Checklist go-live keamanan (§16)
-- [ ] `AUTH_DEV_BYPASS=false` (api menolak boot bila true + NODE_ENV=production).
+## 8. Checklist go-live keamanan
+
+- [ ] `AUTH_DEV_BYPASS=false` dan login Cognito berfungsi.
 - [ ] `NEXTAUTH_SECRET` di-generate, bukan contoh.
-- [ ] `OPENCODE_GO_API_KEY` diisi & tak pakai prefix `NEXT_PUBLIC_` (tak bocor ke browser).
-- [ ] Kredensial MinIO default DIGANTI; console (9001) tak diekspos publik.
-- [ ] Aurora di subnet privat; SG 5432 dari EC2 saja.
-- [ ] HTTPS aktif di semua host (Caddy).
-- [ ] Rate limit AI aktif (Throttler global + per-user/global OpenCode Go via Redis).
-- [ ] AI = OpenCode Go (NON-BYOK); pengguna tak memasukkan API key.
-- [ ] Login Portainer dibuat saat pertama (admin) + password kuat.
-- [ ] Backup: snapshot Aurora otomatis; pertimbangkan replikasi MinIO ke S3.
+- [ ] `OPENCODE_GO_API_KEY` diisi & **tidak** memakai prefix `NEXT_PUBLIC_`.
+- [ ] Kredensial MinIO default sudah diganti; console MinIO tak diekspos publik.
+- [ ] HTTPS aktif (Caddy) di domain web + endpoint MinIO.
+- [ ] Rate limit AI aktif (Throttler global + per-user/global via Redis).
+- [ ] Backup DB dijadwalkan (`pg_dump` / snapshot EBS) — lihat [`DATABASE.md`](./DATABASE.md).
+- [ ] Hanya port 80/443/22 terbuka; 22 dibatasi IP Anda.
 
 ---
 
-## 7. Operasional
-- **Logs**: `docker compose ... logs -f api analyzer extractor`.
+## 9. Operasional
+
+- **Log**: `docker compose ... logs -f api analyzer extractor`.
 - **Update**: `git pull && docker compose ... up -d --build`.
-- **Hemat biaya** (§15): stop EC2 di luar jam pakai; Aurora min ACU 0 auto-pause.
-- **Migrasi baru**: tambah file `db/migrations/000X_*.sql`, jalankan service `migrate`.
-- **Scale**: tambah replika `analyzer`/`extractor` (`--scale analyzer=2`) saat antrean menumpuk.
-- **AI nyata**: set `OPENCODE_GO_API_KEY=...`, `ANALYZER_MOCK=false`, lalu `up -d api analyzer`. Lihat `docs/OPENCODE.md`.
+- **Hemat biaya**: stop EC2 di luar jam pakai. (Catatan: kalau Elastic IP tidak
+  dipakai, IP-nya tetap; tanpa Elastic IP, IP berubah dan DNS harus diperbarui.)
+- **Migrasi baru**: tambah `db/migrations/000X_*.sql`, jalankan service `migrate`.
+- **Scale**: tambah replika `analyzer`/`extractor` (`--scale analyzer=2`) saat
+  antrean menumpuk.

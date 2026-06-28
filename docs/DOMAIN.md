@@ -1,69 +1,54 @@
-# PDFHo!mes — Setup Domain Sendiri
+# DNS, Elastic IP, dan TLS
 
-Panduan untuk deploy menggunakan domain pribadi (contoh: `pdfholmes.stevewithcode.net`).
-Bila belum punya domain, pakai [`docs/RUNBOOK-sslip.md`](./RUNBOOK-sslip.md).
-
----
-
-## 0. Yang disiapkan dulu
-
-- Domain aktif (panel DNS bisa diakses).
-- EC2 berjalan dengan **Elastic IP** (IP tetap).
-- `.env.prod` belum diisi (atau mau diupdate).
+PDFHo!mes dilayani di satu domain — web dan API berbagi origin yang sama
+(`pdfholmes.stevewithcode.net`). MinIO (untuk presigned upload/download) memakai
+host `sslip.io` yang resolve otomatis ke IP, jadi hanya satu A-record yang perlu
+Anda atur.
 
 ---
 
-## 1. Elastic IP (wajib, supaya DNS tidak berubah)
+## 1. Elastic IP
 
-Console: EC2 → Network & Security → **Elastic IPs** → Allocate → Associate ke instance.
-Catat IP, misal `1.2.3.4`.
+Pakai Elastic IP agar IP instance tidak berubah saat di-restart.
+
+Console: EC2 → Network & Security → **Elastic IPs** → Allocate → Associate ke
+instance. Catat IP-nya, misal `52.74.175.80`.
+
+> Tanpa Elastic IP, IP publik EC2 berubah setiap stop/start. Kalau itu terjadi,
+> A-record DNS dan `MINIO_DOMAIN`/`MINIO_PUBLIC_ENDPOINT` (yang memuat IP) harus
+> diperbarui, lalu `web` di-rebuild karena URL API tertanam saat build.
 
 ---
 
-## 2. Set A-record di panel DNS
+## 2. A-record di panel DNS
 
-Masuk panel DNS registrar/hosting-mu (biznetgio, Cloudflare, dll).
-Tambah record berikut (ganti `1.2.3.4` dengan EIP-mu):
+Di panel DNS domain Anda, tambah satu record (ganti dengan Elastic IP Anda):
 
 | Type | Name / Host | Value | TTL |
 |---|---|---|---|
-| A | `pdfholmes` | `1.2.3.4` | 300 |
-| A | `minio.pdfholmes` | `1.2.3.4` | 300 |
-| A | `console.pdfholmes` | `1.2.3.4` | 300 |
-| A | `portainer.pdfholmes` | `1.2.3.4` | 300 |
+| A | `pdfholmes` | `52.74.175.80` | 300 |
 
-**Atau** pakai wildcard (lebih ringkas, hasilnya sama):
+MinIO **tidak** perlu record sendiri: `minio.<ip>.sslip.io` sudah otomatis
+menunjuk ke `<ip>`.
 
-| Type | Name / Host | Value |
-|---|---|---|
-| A | `pdfholmes` | `1.2.3.4` |
-| A | `*.pdfholmes` | `1.2.3.4` |
-
-> **Format "Name"** tergantung panel. Beberapa panel minta bentuk relatif (`pdfholmes`),
-> beberapa minta FQDN penuh (`pdfholmes.stevewithcode.net.`). Kalau ragu, coba bentuk
-> relatif dulu.
+> Format "Name" tergantung panel: ada yang minta bentuk relatif (`pdfholmes`), ada
+> yang minta FQDN (`pdfholmes.stevewithcode.net.`). Coba bentuk relatif dulu.
 
 ---
 
-## 3. Cek propagasi DNS
-
-Propagasi bisa 5 menit sampai beberapa jam. Cek dengan:
+## 3. Cek propagasi
 
 ```bash
-dig +short pdfholmes.stevewithcode.net
-dig +short minio.pdfholmes.stevewithcode.net
-dig +short console.pdfholmes.stevewithcode.net
+dig +short pdfholmes.stevewithcode.net      # harus keluar Elastic IP Anda
 ```
 
-Lanjut ke langkah berikutnya hanya setelah semua sudah keluar IP benar (`1.2.3.4`).
+Lanjut hanya setelah IP yang benar muncul.
 
 ---
 
-## 4. Pastikan port 80 + 443 terbuka di Security Group EC2
+## 4. Port di Security Group
 
-Caddy butuh port 80 reachable untuk ACME HTTP-01 challenge agar TLS bisa terbit otomatis.
-
-EC2 → Security Groups → Inbound rules:
+Caddy butuh port 80 reachable untuk tantangan ACME HTTP-01 agar TLS terbit otomatis.
 
 | Type | Port | Source |
 |---|---|---|
@@ -73,80 +58,49 @@ EC2 → Security Groups → Inbound rules:
 
 ---
 
-## 5. Isi `.env.prod` di EC2
-
-Ganti `pdfholmes.example.com` (atau placeholder lain) dengan domain-mu:
+## 5. `.env`: domain
 
 ```env
+WEB_DOMAIN=pdfholmes.stevewithcode.net
 NEXTAUTH_URL=https://pdfholmes.stevewithcode.net
 NEXT_PUBLIC_API_URL=https://pdfholmes.stevewithcode.net/api
 WEB_ORIGIN=https://pdfholmes.stevewithcode.net
-MINIO_PUBLIC_ENDPOINT=https://minio.pdfholmes.stevewithcode.net
-MINIO_CONSOLE_URL=https://console.pdfholmes.stevewithcode.net
-BASE_DOMAIN=pdfholmes.stevewithcode.net
-ACME_EMAIL=email-mu@contoh.com
+
+MINIO_DOMAIN=minio.52.74.175.80.sslip.io
+MINIO_PUBLIC_ENDPOINT=https://minio.52.74.175.80.sslip.io
 ```
 
-Nilai lain (DB, Redis, Cognito, OpenCode Go) ikuti [`docs/DEPLOY.md`](./DEPLOY.md).
+`WEB_DOMAIN` dan `MINIO_DOMAIN` dipakai Caddy untuk membuat vhost dan menerbitkan
+TLS. `NEXT_PUBLIC_API_URL` tertanam ke bundle web saat build — jadi setelah
+mengubahnya, **rebuild `web`**.
 
 ---
 
-## 6. Update Cognito App Client
+## 6. Callback Cognito
 
-Di Cognito → App clients → pilih client PDFHolmes → Edit:
+App client Cognito hanya menerima callback yang persis terdaftar. Pastikan ada:
 
-- **Callback URL (Return URL)**:
-  ```
-  https://pdfholmes.stevewithcode.net/api/auth/callback/cognito
-  ```
-  Tambah juga URL dev kalau perlu:
-  ```
-  http://localhost:3000/api/auth/callback/cognito
-  ```
-
-- **Sign-out URL**:
-  ```
-  https://pdfholmes.stevewithcode.net
-  ```
-
-Simpan perubahan.
-
----
-
-## 7. Migrasi DB + jalankan
-
-```bash
-PC="docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file .env.prod"
-
-$PC run --rm --build migrate     # "Migrasi selesai."
-$PC up -d --build                # build + jalankan semua service
+```
+Callback : https://pdfholmes.stevewithcode.net/api/auth/callback/cognito
+Sign-out : https://pdfholmes.stevewithcode.net
 ```
 
+Ini disetel oleh Terraform dari variabel `domain` (lihat [`COGNITO.md`](./COGNITO.md)).
+Kalau mengubahnya manual, lakukan di Cognito → App clients → Edit.
+
 ---
 
-## 8. Cek TLS + health
+## 7. Jalankan + cek TLS
 
 ```bash
-$PC logs proxy | grep -i "certificate obtained"   # sertifikat terbit
+PC="docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml --env-file .env"
+
+$PC up -d --build web                       # rebuild bila domain berubah
+$PC logs proxy | grep -i "certificate obtained"
 curl https://pdfholmes.stevewithcode.net/api/health
-curl https://pdfholmes.stevewithcode.net/api/health/ready
 ```
 
-TLS otomatis diurus Caddy (Let's Encrypt). Tidak perlu setup cert manual.
-
----
-
-## 9. Akses
-
-| URL | Layanan |
-|---|---|
-| `https://pdfholmes.stevewithcode.net` | Aplikasi utama |
-| `https://minio.pdfholmes.stevewithcode.net` | MinIO API |
-| `https://console.pdfholmes.stevewithcode.net` | MinIO Console |
-| `https://portainer.pdfholmes.stevewithcode.net` | Portainer (monitoring Docker) |
-
-> **Portainer**: buat akun admin segera setelah pertama buka — ada jendela waktu
-> singkat sebelum otomatis terkunci.
+TLS sepenuhnya diurus Caddy — tidak ada cert manual.
 
 ---
 
@@ -154,8 +108,9 @@ TLS otomatis diurus Caddy (Let's Encrypt). Tidak perlu setup cert manual.
 
 | Gejala | Kemungkinan penyebab | Solusi |
 |---|---|---|
-| TLS tidak terbit | Port 80 belum publik | Cek SG EC2 |
+| TLS tidak terbit | Port 80 belum publik | cek Security Group EC2 |
 | TLS tidak terbit | DNS belum propagasi | `dig` lagi, tunggu |
-| `502 Bad Gateway` | Service belum ready | `$PC logs api` |
-| Login Cognito gagal redirect | Callback URL salah | Update App client Cognito |
-| `dig` keluar IP lain | A-record salah | Cek panel DNS, hapus record lama |
+| `502 Bad Gateway` | service belum siap | `$PC logs api` |
+| Login Cognito gagal redirect | callback URL salah | perbarui App client Cognito |
+| Upload PDF gagal/timeout | `MINIO_*` masih IP lama | samakan dengan Elastic IP, rebuild web |
+| `dig` keluar IP lain | A-record salah | cek panel DNS, hapus record lama |

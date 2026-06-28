@@ -1,42 +1,40 @@
-# Caddy reverse proxy + auto-HTTPS publik via sslip.io (§13).
-# BASE_DOMAIN di-inject dari env (mis. 13.229.73.155.sslip.io).
-# Semua trafik publik masuk lewat 80/443 -> hanya 2 port itu yang perlu dibuka
-# di AWS Security Group. Caddy ambil sertifikat Let's Encrypt otomatis (butuh
-# port 80 reachable dari internet utk tantangan HTTP-01).
+# Caddy reverse proxy + auto-HTTPS publik (Let's Encrypt).
+# Hanya port 80/443 yang perlu dibuka di AWS Security Group; port 80 harus
+# reachable dari internet untuk tantangan HTTP-01.
+#
+# Domain di-inject dari env:
+#   WEB_DOMAIN   = host web+API (satu origin), mis. pdfholmes.stevewithcode.net
+#   MINIO_DOMAIN = host MinIO S3 untuk presigned upload/download
 
 {
-	# email opsional utk Let's Encrypt (set di prod sungguhan):
+	# email opsional utk notifikasi Let's Encrypt:
 	# email you@example.com
 }
 
-# ---- PDFHo!mes (web + api satu origin) ----
-pdfholmes.{$BASE_DOMAIN} {
-	# API -> NestJS (prefix /api dipertahankan). SSE: flush_interval -1.
+# ---- Web + API (satu origin) ----
+{$WEB_DOMAIN} {
+	encode gzip zstd
+
+	# Auth.js (NextAuth) hidup di service web, BUKAN api NestJS.
+	# Harus didahulukan dari /api/* (matcher lebih spesifik) agar callback
+	# OAuth Cognito (/api/auth/callback/cognito) sampai ke web.
+	handle /api/auth/* {
+		reverse_proxy web:3000
+	}
+
+	# Sisa /api/* -> NestJS (prefix /api dipertahankan). SSE: flush_interval -1.
 	handle /api/* {
 		reverse_proxy api:4000 {
 			flush_interval -1
 		}
 	}
+
 	handle {
 		reverse_proxy web:3000
 	}
 }
 
-# ---- Portainer (UI manajemen Docker; serve HTTPS internal di 9443) ----
-portainer.{$BASE_DOMAIN} {
-	reverse_proxy https://portainer:9443 {
-		transport http {
-			tls_insecure_skip_verify
-		}
-	}
-}
-
-# ---- MinIO S3 API (dipakai presigned URL upload/download) ----
-minio.{$BASE_DOMAIN} {
+# ---- MinIO S3 API (presigned URL upload/download) ----
+{$MINIO_DOMAIN} {
 	reverse_proxy minio:9000
-}
-
-# ---- MinIO Console (admin web) ----
-console.{$BASE_DOMAIN} {
-	reverse_proxy minio:9001
 }

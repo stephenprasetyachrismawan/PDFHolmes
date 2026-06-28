@@ -19,8 +19,9 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      # Domain dasar publik (mis. sslip.io). Dipakai Caddyfile utk vhost + auto-TLS.
-      BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+      # Domain publik dipakai Caddyfile utk vhost + auto-TLS.
+      WEB_DOMAIN: ${WEB_DOMAIN:-localhost}
+      MINIO_DOMAIN: ${MINIO_DOMAIN:-minio.localhost}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

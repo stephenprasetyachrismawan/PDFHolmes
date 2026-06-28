@@ -1,34 +1,42 @@
-# Terraform — Cognito + Aurora (PDFHo!mes)
+# Terraform — Cognito (PDFHo!mes)
 
-Provisioning identitas (Cognito) + database (Aurora Serverless v2) untuk produksi (§11–12).
+Terraform di sini menyiapkan **Amazon Cognito** (User Pool, Hosted UI domain, dan
+App client) untuk login PDFHo!mes. Itulah satu-satunya layanan AWS yang dipakai
+deployment ini — database berjalan sebagai container Postgres di EC2, bukan Aurora
+(lihat [`../../docs/DATABASE.md`](../../docs/DATABASE.md)).
 
 ## Prasyarat
-- Terraform ≥ 1.6, kredensial AWS (`aws configure` / env / SSO).
-- Domain web publik sudah ditentukan (callback Cognito).
+
+- Terraform ≥ 1.6 dan kredensial AWS (`aws configure` / env / SSO).
+- Domain web publik sudah ditentukan (dipakai untuk callback Cognito).
 
 ## Pakai
+
 ```bash
 cd infra/aws
-cp terraform.tfvars.example terraform.tfvars   # isi domain, prefix, region, CIDR
+cp terraform.tfvars.example terraform.tfvars   # isi domain, cognito_domain_prefix, region
 terraform init
 terraform plan
 terraform apply
 ```
 
-## Setelah apply — ambil output utk .env produksi
+## Ambil output untuk `.env`
+
 ```bash
 terraform output cognito_issuer
 terraform output cognito_jwks_url
+terraform output cognito_user_pool_id
 terraform output cognito_client_id
-terraform output -raw cognito_client_secret
-terraform output aurora_endpoint
-terraform output -raw database_secret_arn   # DATABASE_URL lengkap ada di secret ini
+terraform output -raw cognito_client_secret   # rahasia
 ```
 
-Lihat `docs/DEPLOY.md` untuk pemetaan output → variabel `.env` dan langkah migrasi.
+Pemetaan output → variabel `.env`: [`../../docs/COGNITO.md`](../../docs/COGNITO.md).
 
 ## Catatan
-- `aurora_min_acu = 0` → auto-pause saat idle (hemat) tapi cold start ±15 dtk. Prod dgn user aktif: set `0.5`.
-- SG Aurora hanya buka 5432 dari `allowed_app_cidr`. Set ke CIDR subnet EC2 host.
-- Ekstensi `vector`/`pgcrypto` diaktifkan oleh migrasi aplikasi (`db/migrations/0001_init.sql`), bukan Terraform.
-- `terraform destroy` menghapus Cognito pool + Aurora (skip_final_snapshot=true). Hati-hati di prod.
+
+- App client hanya menerima callback `https://<domain>/api/auth/callback/cognito`.
+  Kalau domain web berubah, ubah variabel `domain` lalu `terraform apply`.
+- Ekstensi `vector`/`pgcrypto` diaktifkan oleh migrasi aplikasi
+  (`db/migrations/0001_init.sql`), bukan Terraform.
+- `terraform destroy` menghapus User Pool Cognito — **semua pengguna ikut hilang**.
+  Hati-hati di produksi.
