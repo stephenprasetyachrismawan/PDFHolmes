@@ -57,9 +57,25 @@ def _load_document(conn: psycopg.Connection, document_id: str) -> dict | None:
     }
 
 
+def _strip_nul(value):
+    """Buang NUL (0x00) dari semua string. Postgres text & jsonb menolak \\u0000;
+    PDF kadang menghasilkannya, bikin INSERT gagal ('cannot contain NUL bytes')."""
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, dict):
+        return {k: _strip_nul(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_strip_nul(v) for v in value]
+    return value
+
+
 def _save_extraction(conn: psycopg.Connection, document_id: str, *,
                      full_text: str, tei_xml: str | None,
                      sections: dict, metadata: dict) -> None:
+    full_text = _strip_nul(full_text)
+    tei_xml = _strip_nul(tei_xml)
+    sections = _strip_nul(sections)
+    metadata = _strip_nul(metadata)
     with conn.cursor() as cur:
         cur.execute(
             """INSERT INTO extractions

@@ -59,6 +59,20 @@ export function AnalysisPanel({
 
   return (
     <div className="flex h-full flex-col">
+      {/* Bar aksi: ulangi analisis (hasil tersimpan; tak otomatis dijalankan ulang) */}
+      <div className="flex items-center justify-between border-b bg-white px-3 py-2">
+        <span className="text-xs text-slate-500">
+          {analyzing ? "Menganalisis…" : "Hasil analisis tersimpan"}
+        </span>
+        <button
+          onClick={() => trigger.mutate(undefined)}
+          disabled={trigger.isPending || analyzing}
+          className="rounded border px-3 py-1 text-xs font-medium text-brand hover:bg-teal-50 disabled:opacity-50"
+        >
+          {trigger.isPending ? "Memulai…" : "↻ Ulangi Analisis"}
+        </button>
+      </div>
+
       {/* Tab (§7: Ikhtisar / Metodologi / Hasil / Analisis Kritis & Gap) */}
       <div className="flex gap-1 overflow-x-auto border-b bg-slate-50 px-2">
         {TAB_ORDER.map((tab) => (

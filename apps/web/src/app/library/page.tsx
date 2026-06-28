@@ -6,17 +6,46 @@ import { useDocuments, useFolders, useCreateFolder } from "@/lib/hooks";
 import { UploadButton } from "@/components/UploadButton";
 import { StatusBadge } from "@/components/StatusBadge";
 
+type Crumb = { id: string; name: string };
+
 export default function LibraryPage() {
-  // Folder root saja utk MVP (nested folder didukung api via parentId).
-  const [folderId] = useState<string | null>(null);
+  // Jejak folder (breadcrumb). Kosong = root. Folder terakhir = lokasi aktif.
+  const [path, setPath] = useState<Crumb[]>([]);
+  const folderId = path.length ? path[path.length - 1].id : null;
+
   const folders = useFolders(folderId);
   const docs = useDocuments(folderId);
   const createFolder = useCreateFolder();
 
+  const openFolder = (c: Crumb) => setPath((p) => [...p, c]);
+  const goTo = (index: number) => setPath((p) => p.slice(0, index)); // index=0 -> root
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Pustaka</h1>
+        {/* Breadcrumb */}
+        <nav className="flex flex-wrap items-center gap-1 text-sm">
+          <button
+            onClick={() => goTo(0)}
+            className={folderId ? "text-brand hover:underline" : "font-semibold"}
+          >
+            Pustaka
+          </button>
+          {path.map((c, i) => (
+            <span key={c.id} className="flex items-center gap-1">
+              <span className="text-slate-400">/</span>
+              <button
+                onClick={() => goTo(i + 1)}
+                className={
+                  i === path.length - 1 ? "font-semibold" : "text-brand hover:underline"
+                }
+              >
+                {c.name}
+              </button>
+            </span>
+          ))}
+        </nav>
+
         <div className="flex gap-2">
           <button
             onClick={() => {
@@ -31,13 +60,17 @@ export default function LibraryPage() {
         </div>
       </div>
 
-      {/* Folder */}
+      {/* Folder (klik untuk masuk) */}
       {folders.data && folders.data.length > 0 && (
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {folders.data.map((f) => (
-            <div key={f.id} className="rounded-lg border bg-white p-3 text-sm">
+            <button
+              key={f.id}
+              onClick={() => openFolder({ id: f.id, name: f.name })}
+              className="rounded-lg border bg-white p-3 text-left text-sm transition hover:shadow hover:border-brand"
+            >
               📁 {f.name}
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -67,7 +100,9 @@ export default function LibraryPage() {
         </div>
       ) : (
         <div className="rounded-lg border border-dashed bg-white p-12 text-center text-slate-500">
-          Belum ada dokumen. Unggah PDF artikel riset untuk memulai.
+          {folderId
+            ? "Folder ini kosong. Unggah PDF atau buat subfolder."
+            : "Belum ada dokumen. Unggah PDF artikel riset untuk memulai."}
         </div>
       )}
     </div>
