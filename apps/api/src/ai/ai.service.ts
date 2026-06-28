@@ -76,10 +76,16 @@ export class AiService {
       : `${oc.baseUrl}/v1/chat/completions`;
 
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${oc.apiKey}`,
       "Content-Type": "application/json",
     };
-    if (isAnthropic) headers["anthropic-version"] = "2023-06-01";
+    if (isAnthropic) {
+      // Protokol Anthropic pakai header x-api-key (BUKAN Authorization: Bearer),
+      // kalau tidak server balas 401 "Missing API key."
+      headers["x-api-key"] = oc.apiKey;
+      headers["anthropic-version"] = "2023-06-01";
+    } else {
+      headers["Authorization"] = `Bearer ${oc.apiKey}`;
+    }
 
     const body = isAnthropic
       ? {

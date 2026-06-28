@@ -10,6 +10,10 @@ export interface CognitoClaims {
   email?: string;
   "cognito:username"?: string;
   name?: string;
+  // Untuk verifikasi audience: access token Cognito punya client_id, id token punya aud.
+  aud?: string;
+  client_id?: string;
+  token_use?: string;
 }
 
 @Injectable()

@@ -11,6 +11,11 @@
 # ---- Web + API (satu origin) ----
 {$BASE_DOMAIN} {
 	encode gzip zstd
+	# Auth.js (NextAuth) endpoint ada di service web, BUKAN api NestJS.
+	# Harus didahulukan dari /api/* (matcher lebih spesifik).
+	handle /api/auth/* {
+		reverse_proxy web:3000
+	}
 	handle /api/* {
 		reverse_proxy api:4000 {
 			flush_interval -1

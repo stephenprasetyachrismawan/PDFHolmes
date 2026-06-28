@@ -31,6 +31,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, "cognito-jwt") {
   // Hasil validate jadi request.user — di sini sudah DbUser tersinkron.
   async validate(payload: CognitoClaims): Promise<DbUser> {
     if (!payload?.sub) throw new UnauthorizedException("token tanpa sub");
+    // KEAMANAN: verifikasi audience. Tanpa ini, token sah dari app-client lain
+    // di user pool yg sama bisa diterima. Access token punya client_id, id token punya aud.
+    const expected = config.cognito.clientId;
+    if (expected) {
+      const got = payload.client_id ?? payload.aud;
+      if (got !== expected) throw new UnauthorizedException("audience token tidak cocok");
+    }
     return this.users.syncFromClaims(payload);
   }
 }

@@ -16,8 +16,18 @@ out/
 .env
 .env.local
 .env.*.local
+.env.prod
+.env.*
+!.env.example
+!.env.prod.example
 *.pem
 codex-home/
+
+# terraform (state + tfvars hold secrets)
+infra/aws/.terraform/
+infra/aws/*.tfstate
+infra/aws/*.tfstate.backup
+infra/aws/terraform.tfvars
 
 # data
 infra/data/

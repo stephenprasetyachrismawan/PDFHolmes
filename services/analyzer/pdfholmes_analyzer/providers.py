@@ -81,7 +81,7 @@ class OpenCodeGoProvider:
     per-user. Routing mengikuti OPENCODE_GO_PROVIDER_TYPE:
       anthropic -> POST {base}/v1/messages   (header anthropic-version)
       openai    -> POST {base}/v1/chat/completions
-    Auth selalu: Authorization: Bearer <key>.
+    Auth: anthropic -> header x-api-key; openai -> Authorization: Bearer.
     """
 
     name = "opencode_go"
@@ -127,8 +127,10 @@ class OpenCodeGoProvider:
                 {"role": "user", "content": self._user_content(field_key, prompt, context)},
             ],
         }
+        # Protokol Anthropic pakai header x-api-key (BUKAN Authorization: Bearer),
+        # kalau tidak server balas 401 "Missing API key."
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01",
             "Content-Type": "application/json",
         }
