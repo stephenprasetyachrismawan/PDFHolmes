@@ -23,7 +23,7 @@ Garis besar:
 
 ---
 
-## 2. Provision Cognito
+## 2. Provision Cognito + Aurora
 
 ```bash
 cd infra/aws
@@ -31,8 +31,11 @@ cp terraform.tfvars.example terraform.tfvars   # isi domain, cognito_domain_pref
 terraform init && terraform apply
 ```
 
-Ambil outputnya untuk `.env` (issuer, jwks_url, client_id, client_secret,
+Ambil output Cognito untuk `.env` (issuer, jwks_url, client_id, client_secret,
 user_pool_id). Langkah lengkap + pemetaan env: [`COGNITO.md`](./COGNITO.md).
+
+Siapkan juga database **Aurora PostgreSQL** dengan IAM auth (user `app` anggota
+`rds_iam`, database `pdfholmes`) — langkah lengkap di [`DATABASE.md`](./DATABASE.md).
 
 ---
 
@@ -41,8 +44,11 @@ user_pool_id). Langkah lengkap + pemetaan env: [`COGNITO.md`](./COGNITO.md).
 1. Luncurkan EC2 **Graviton** (`t4g.medium`/`t4g.large`) dengan **Elastic IP** agar
    IP tetap.
 2. EBS gp3 ~40GB.
-3. Security Group: **80/443 publik**, **22 hanya IP Anda**.
-4. Pasang Docker:
+3. **Instance role** (mis. `pdfholmes-ec2`) dengan izin `rds-db:connect` ke user DB
+   `app` — supaya container bisa membuat token IAM tanpa menyimpan kredensial.
+4. Pastikan Security Group Aurora mengizinkan 5432 dari EC2.
+5. Security Group EC2: **80/443 publik**, **22 hanya IP Anda**.
+6. Pasang Docker:
    ```bash
    sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
    sudo systemctl enable --now docker && sudo usermod -aG docker $USER
@@ -83,11 +89,11 @@ COGNITO_CLIENT_SECRET=...
 COGNITO_ISSUER=...
 COGNITO_JWKS_URL=...
 
-# Database container (lihat DATABASE.md)
-POSTGRES_USER=app
-POSTGRES_PASSWORD=<openssl rand -hex 24>
-POSTGRES_DB=pdfholmes
-DATABASE_URL=postgres://app:<password sama>@db:5432/pdfholmes
+# Database = Aurora PostgreSQL + IAM auth (lihat DATABASE.md).
+# Tanpa password: user 'app' (rds_iam) pakai token IAM lewat instance role EC2.
+DATABASE_URL=postgres://app@<cluster-endpoint>:5432/pdfholmes
+DB_IAM_AUTH=true
+DB_IAM_REGION=ap-southeast-1
 
 # AI (lihat OPENCODE.md)
 OPENCODE_GO_API_KEY=sk-...
@@ -98,14 +104,12 @@ OPENCODE_GO_API_KEY=sk-...
 ## 5. Jalankan
 
 ```bash
-docker compose \
-  -f infra/docker-compose.yml \
-  -f infra/docker-compose.dev.yml \
-  --env-file .env up -d
+docker compose -f infra/docker-compose.yml --env-file .env up -d
 ```
 
-File compose kedua menambahkan service `db` (Postgres + pgvector). Service `migrate`
-membuat tabel + ekstensi otomatis sebelum `api` mulai.
+Database eksternal (Aurora), jadi tidak ada container Postgres. Service `migrate`
+menyambung ke Aurora via IAM dan membuat tabel + ekstensi otomatis sebelum `api`
+mulai.
 
 ---
 
@@ -143,7 +147,7 @@ analisis terisi.
 - [ ] Kredensial MinIO default sudah diganti; console MinIO tak diekspos publik.
 - [ ] HTTPS aktif (Caddy) di domain web + endpoint MinIO.
 - [ ] Rate limit AI aktif (Throttler global + per-user/global via Redis).
-- [ ] Backup DB dijadwalkan (`pg_dump` / snapshot EBS) — lihat [`DATABASE.md`](./DATABASE.md).
+- [ ] DB pakai IAM auth (tanpa password statis) + SSL; backup Aurora aktif — lihat [`DATABASE.md`](./DATABASE.md).
 - [ ] Hanya port 80/443/22 terbuka; 22 dibatasi IP Anda.
 
 ---

@@ -39,8 +39,8 @@ Dokumen ini menjelaskan bagaimana bagian-bagian PDFHo!mes saling terhubung:
                                  └──────────┬────────────┘
                                             ▼
                                  ┌────────────────────────┐
-                                 │  Postgres 16 + pgvector │
-                                 │  (container, db_data)   │
+                                 │   Aurora PostgreSQL 17  │
+                                 │  pgvector · IAM auth/SSL │
                                  └────────────────────────┘
 ```
 
@@ -54,8 +54,10 @@ Service (Docker Compose, satu jaringan):
 | `analyzer` | Python + OpenCode Go | per-field prompt → OpenCode Go → `analysis_sections` |
 | `redis` | redis:7 | antrian job (`queue:extract`, `queue:analyze`) + pub/sub status |
 | `minio` | MinIO | penyimpanan PDF, satu bucket per pengguna |
-| `db` | Postgres 16 + pgvector | data relasional + embedding |
 | `proxy` | Caddy 2 | HTTPS otomatis + routing |
+
+Database = **Aurora PostgreSQL (Serverless v2)** + pgvector, di luar Compose,
+diakses lewat IAM auth (lihat bagian 4).
 
 ---
 
@@ -89,7 +91,7 @@ Detail: [`COGNITO.md`](./COGNITO.md).
 
 ---
 
-## 4. Hubungan ke Database (Postgres + pgvector)
+## 4. Hubungan ke Database (Aurora PostgreSQL + pgvector)
 
 | Tabel | Isi | Relasi |
 |---|---|---|
@@ -108,7 +110,8 @@ Detail: [`COGNITO.md`](./COGNITO.md).
   (`user_id, model, input_length, status, latency_ms, created_at`) — **tanpa**
   prompt dan **tanpa** API key.
 
-Database berjalan sebagai container; detail & backup: [`DATABASE.md`](./DATABASE.md).
+Database = Aurora dengan **IAM auth** (token IAM per koneksi + SSL); kredensial
+diambil dari instance role EC2. Detail & backup: [`DATABASE.md`](./DATABASE.md).
 
 ---
 

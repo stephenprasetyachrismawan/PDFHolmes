@@ -93,7 +93,7 @@ Kalau mengubahnya manual, lakukan di Cognito → App clients → Edit.
 ## 7. Jalankan + cek TLS
 
 ```bash
-PC="docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml --env-file .env"
+PC="docker compose -f infra/docker-compose.yml --env-file .env"
 
 $PC up -d --build web                       # rebuild bila domain berubah
 $PC logs proxy | grep -i "certificate obtained"

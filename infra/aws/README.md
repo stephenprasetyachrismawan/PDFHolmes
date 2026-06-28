@@ -1,9 +1,10 @@
-# Terraform — Cognito (PDFHo!mes)
+# Terraform — Cognito + Aurora (PDFHo!mes)
 
-Terraform di sini menyiapkan **Amazon Cognito** (User Pool, Hosted UI domain, dan
-App client) untuk login PDFHo!mes. Itulah satu-satunya layanan AWS yang dipakai
-deployment ini — database berjalan sebagai container Postgres di EC2, bukan Aurora
-(lihat [`../../docs/DATABASE.md`](../../docs/DATABASE.md)).
+Terraform di sini menyiapkan **Amazon Cognito** (User Pool, Hosted UI domain, App
+client) untuk login dan komponen pendukung **Aurora** (secret + security group).
+Database aplikasi adalah **Aurora PostgreSQL dengan IAM auth** — lihat
+[`../../docs/DATABASE.md`](../../docs/DATABASE.md) untuk user `app`, role `rds_iam`,
+dan instance role EC2.
 
 ## Prasyarat
 

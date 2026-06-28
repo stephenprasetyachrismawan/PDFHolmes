@@ -33,8 +33,10 @@ Semua bagian berjalan sebagai container Docker dalam satu jaringan:
 | `analyzer` | Python + OpenCode Go | Per field: kirim ke OpenCode Go → `analysis_sections` |
 | `redis` | redis:7 | Antrian job + pub/sub status |
 | `minio` | MinIO | Penyimpanan PDF, satu bucket per pengguna |
-| `db` | Postgres 16 + pgvector | Data relasional + embedding |
 | `proxy` | Caddy 2 | HTTPS otomatis + routing |
+
+Database memakai **Aurora PostgreSQL (Serverless v2)** dengan pgvector, diakses lewat
+IAM auth — terpisah dari container, jadi tidak ada service DB di tabel di atas.
 
 Detail relasi antar-komponen ada di [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
@@ -61,15 +63,12 @@ Stack berjalan dari satu host EC2 dengan Docker Compose. Konfigurasinya ada di
 `.env` (tidak ikut di Git).
 
 ```bash
-docker compose \
-  -f infra/docker-compose.yml \
-  -f infra/docker-compose.dev.yml \
-  --env-file .env up -d
+docker compose -f infra/docker-compose.yml --env-file .env up -d
 ```
 
-File compose kedua menambahkan service `db` (Postgres + pgvector dengan volume
-persisten) — itulah database yang dipakai deployment ini. Migrasi DB jalan otomatis
-lewat service `migrate` saat `up`.
+Database eksternal (Aurora), jadi tidak ada container Postgres — cukup compose
+dasar. Service `migrate` menyambung ke Aurora via IAM dan menerapkan migrasi
+otomatis saat `up`. Detail: [`docs/DATABASE.md`](./docs/DATABASE.md).
 
 Cek sehat:
 

@@ -1,58 +1,54 @@
-# Database — Postgres + pgvector dalam Container
+# Database — Aurora PostgreSQL (IAM Auth)
 
-PDFHo!mes menyimpan datanya di **Postgres 16 dengan ekstensi pgvector**, berjalan
-sebagai container Docker di host EC2 yang sama dengan service lain. Datanya bertahan
-di volume `db_data`.
+PDFHo!mes menyimpan datanya di **Amazon Aurora Serverless v2 (PostgreSQL 17)**
+dengan ekstensi **pgvector**. Akses memakai **IAM database authentication**: tidak
+ada password statis — aplikasi membuat token IAM 15 menit setiap koneksi, lewat TLS.
 
-Pilihan ini sederhana dan murah: tidak ada database managed terpisah, semuanya
-hidup di satu instance. Yang perlu Anda ingat: backup adalah tanggung jawab Anda
-(lihat bagian Backup di bawah) — tidak ada snapshot otomatis seperti layanan
-managed.
+Kenapa begini: kredensial database tidak pernah disimpan di file. Yang dipakai
+adalah identitas IAM dari **instance role EC2** (`pdfholmes-ec2`, dengan policy
+`pdfholmes-rds-connect`). Aurora juga managed — ada backup otomatis dan auto-pause
+saat idle (Serverless v2, min ACU 0).
 
 ---
 
 ## Konfigurasi
 
-Database disetel lewat empat baris di `.env`:
+Tiga baris di `.env`:
 
 ```env
-POSTGRES_USER=app
-POSTGRES_PASSWORD=<password kuat>
-POSTGRES_DB=pdfholmes
-DATABASE_URL=postgres://app:<password kuat>@db:5432/pdfholmes
+DATABASE_URL=postgres://app@<cluster-endpoint>:5432/pdfholmes
+DB_IAM_AUTH=true
+DB_IAM_REGION=ap-southeast-1
 ```
 
-Dua hal yang sering bikin gagal:
+- **Tidak ada password** di `DATABASE_URL` — user `app` memakai token IAM.
+- User `app` di Aurora adalah anggota role **`rds_iam`** dan `LOGIN`.
+- `DB_IAM_AUTH=true` membuat `api`, `extractor`, `analyzer`, dan `migrate`
+  menghasilkan token IAM via `@aws-sdk/rds-signer` dan menyambung dengan SSL
+  (`apps/api/src/db/db.module.ts`, `db/migrate.mjs`).
 
-- **Password di `POSTGRES_PASSWORD` dan di `DATABASE_URL` harus sama persis.**
-- **Host-nya `db`** (nama service compose), bukan `localhost`.
-
-> Buat password dengan `openssl rand -hex 24` — hasilnya aman dipakai di URL.
-> Hindari `-base64`: karakter `/` `+` `=` bisa merusak parsing `DATABASE_URL`.
+Kredensial AWS diambil otomatis dari instance role EC2 (rantai kredensial default
+SDK lewat IMDS) — tidak perlu menaruh access key di mana pun.
 
 ---
 
-## Bagaimana ia dijalankan
+## Cara dijalankan
 
-Service `db` ditambahkan oleh file override compose kedua, dan `migrate`/`api`/
-`extractor`/`analyzer` menunggu sampai DB sehat sebelum mulai:
+Stack produksi memakai compose dasar saja (tanpa override) — database eksternal,
+jadi tidak ada container Postgres:
 
 ```bash
-docker compose \
-  -f infra/docker-compose.yml \
-  -f infra/docker-compose.dev.yml \
-  --env-file .env up -d
+docker compose -f infra/docker-compose.yml --env-file .env up -d
 ```
 
-Migrasi (membuat tabel + mengaktifkan ekstensi `vector` dan `pgcrypto`) dijalankan
-otomatis oleh service `migrate`. Port 5432 tidak diekspos keluar — hanya jaringan
-internal compose yang bisa mengaksesnya.
+Service `migrate` jalan lebih dulu, menyambung ke Aurora via IAM, dan menerapkan
+file di `db/migrations/` (membuat tabel + ekstensi `vector`/`pgcrypto`). Idempoten —
+yang sudah diterapkan akan di-skip.
 
 Verifikasi:
 
 ```bash
-docker compose ... ps                                        # db = healthy
-curl https://pdfholmes.stevewithcode.net/api/health/ready    # db + redis ok
+curl https://pdfholmes.stevewithcode.net/api/health/ready   # {"db":"ok","redis":"ok"}
 ```
 
 ---
@@ -68,33 +64,43 @@ curl https://pdfholmes.stevewithcode.net/api/health/ready    # db + redis ok
 | `analyses` | Satu sesi analisis (bahasa, model) |
 | `analysis_sections` | 48 field hasil + `embedding` (pgvector) |
 | `ai_usage` | Audit pemakaian AI (tanpa prompt, tanpa key) |
+| `_migrations` | Catatan migrasi yang sudah diterapkan |
 
 ---
 
-## Backup
+## Provisioning
 
-Tidak ada backup otomatis — jadwalkan sendiri. Cara paling mudah, dump ke file:
+Cluster Aurora disiapkan dengan IAM auth aktif, user `app` (anggota `rds_iam`),
+database `pdfholmes`, dan instance role EC2 yang punya `rds-db:connect`. Setelah itu
+schema dibuat oleh service `migrate`. Untuk membangun ulang dari nol:
 
-```bash
-PC="docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml --env-file .env"
+```sql
+-- sebagai master (lewat token IAM, sslmode=require):
+CREATE DATABASE pdfholmes;
+\c pdfholmes
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-# Backup
-$PC exec db pg_dump -U app pdfholmes > backup_$(date +%F).sql
-
-# Restore
-cat backup_YYYY-MM-DD.sql | $PC exec -T db psql -U app -d pdfholmes
+CREATE ROLE app LOGIN;
+GRANT rds_iam TO app;
+GRANT ALL PRIVILEGES ON DATABASE pdfholmes TO app;
 ```
 
-Untuk perlindungan tambahan, ambil snapshot EBS instance EC2 secara berkala.
+Lalu jalankan service `migrate` untuk tabelnya.
 
 ---
 
-## Menambah migrasi
+## Backup & operasional
 
-Tambahkan file baru `db/migrations/000X_nama.sql`, lalu jalankan ulang service
-`migrate`:
-
-```bash
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml \
-  --env-file .env run --rm migrate
-```
+- **Backup**: Aurora punya snapshot otomatis (retensi sesuai setelan cluster) plus
+  point-in-time recovery. Snapshot manual via konsol RDS bila perlu.
+- **Auto-pause**: min ACU 0 → cluster tidur saat idle; koneksi pertama setelah idle
+  butuh ~15 detik untuk bangun. Untuk menghindari cold start, set min ACU `0.5`.
+- **Migrasi baru**: tambah `db/migrations/000X_nama.sql`, lalu jalankan ulang
+  service `migrate`.
+- **Konek manual** (debug): buat token IAM lalu pakai sebagai password —
+  ```bash
+  TOKEN=$(aws rds generate-db-auth-token --hostname <endpoint> --port 5432 \
+    --username app --region ap-southeast-1)
+  PGPASSWORD="$TOKEN" psql "host=<endpoint> user=app dbname=pdfholmes sslmode=require"
+  ```

@@ -43,8 +43,7 @@ Dua service membaca env yang sama: `api` (chat) dan `analyzer` (analisis 48 fiel
 Setelah mengubahnya, restart keduanya:
 
 ```bash
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml \
-  --env-file .env up -d api analyzer
+docker compose -f infra/docker-compose.yml --env-file .env up -d api analyzer
 ```
 
 Cobalah: buka **Asisten AI** lalu kirim pesan, atau unggah PDF dan tunggu field
