@@ -24,6 +24,7 @@ services:
       MINIO_DOMAIN: ${MINIO_DOMAIN:-minio.localhost}
       MINIO_CONSOLE_DOMAIN: ${MINIO_CONSOLE_DOMAIN:-console.minio.localhost}
       PORTAINER_DOMAIN: ${PORTAINER_DOMAIN:-portainer.localhost}
+      PGWEB_DOMAIN: ${PGWEB_DOMAIN:-db.localhost}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

@@ -63,3 +63,16 @@
 {$PORTAINER_DOMAIN} {
 	reverse_proxy portainer:9000
 }
+
+# ---- pgweb (UI browse Aurora PostgreSQL) ----
+# Container pgweb dijalankan ON-DEMAND via scripts/db-gui.sh (token IAM
+# 15-mnt; relaunch tiap sesi). pgweb TAK punya auth sendiri → wajib
+# basic_auth di sini. pgweb pakai cookie session (bukan header
+# Authorization) jadi tak bentrok dgn Basic seperti Portainer.
+# Bila container pgweb mati, host ini balas 502 — itu normal (belum launch).
+{$PGWEB_DOMAIN} {
+	basic_auth {
+		admin $2a$14$I7GqPHGota6/AHa7ViT8VuF0FfEAMr8zsnnNJB8rhCxtWoLL8iSI.
+	}
+	reverse_proxy pgweb:8081
+}
