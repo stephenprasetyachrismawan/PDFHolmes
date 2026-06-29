@@ -54,11 +54,12 @@
 # pakai header Authorization. XHR Portainer kirim "Bearer <jwt>" yang menimpa
 # "Basic ..." → Caddy balas 401 → login Portainer gagal ("unauthorized").
 # Keamanan via login admin Portainer sendiri.
-# Portainer serve HTTPS self-signed di 9443; lewati verifikasi TLS internal.
+#
+# Proxy ke port HTTP polos 9000 (BUKAN https 9443). Terminasi TLS cukup
+# sekali di Caddy; Caddy kirim X-Forwarded-Proto=https. Double-TLS
+# (Caddy→9443 skip-verify) bikin proteksi CSRF Portainer 2.21 salah
+# deteksi secure-context → token CSRF kosong, POST 403, environment
+# "unreachable".
 {$PORTAINER_DOMAIN} {
-	reverse_proxy https://portainer:9443 {
-		transport http {
-			tls_insecure_skip_verify
-		}
-	}
+	reverse_proxy portainer:9000
 }
