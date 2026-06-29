@@ -180,7 +180,7 @@ services:
   # Portainer — UI manajemen Docker. Port 9443 (HTTPS); 9000 sengaja dihindari
   # karena dipakai MinIO. Buka https://localhost:9443 lalu buat admin saat pertama.
   portainer:
-    image: portainer/portainer-ce:2.21.4
+    image: portainer/portainer-ce:2.39.4
     restart: unless-stopped
     ports:
       - "9443:9443"
