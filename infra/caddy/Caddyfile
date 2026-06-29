@@ -53,7 +53,7 @@
 # Portainer serve HTTPS self-signed di 9443; lewati verifikasi TLS internal.
 {$PORTAINER_DOMAIN} {
 	basic_auth {
-		admin $2a$14$WCYE8dIuw3vNEdIsR5m8M.fEpaYgZlLqcAP8vvD/5YnzvrczMXiK.
+		admin $2a$14$PxbHBvPuTQvCEgz8xSntfenti0Np9W2jrrIveyIEJQXDT7O5JoTS6
 	}
 	reverse_proxy https://portainer:9443 {
 		transport http {
