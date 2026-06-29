@@ -37,8 +37,16 @@
 
 # ---- MinIO S3 API (presigned URL upload/download) ----
 # Ini API S3, BUKAN halaman UI — buka di browser akan menampilkan XML AccessDenied.
+# Dipakai app sbg MINIO_PUBLIC_ENDPOINT; HARUS tetap ke port 9000.
 {$MINIO_DOMAIN} {
 	reverse_proxy minio:9000
+}
+
+# ---- MinIO Console (UI manajemen, port 9001) ----
+# Domain terpisah dari API. Login pakai MINIO_ROOT_USER / MINIO_ROOT_PASSWORD.
+# MINIO_BROWSER_REDIRECT_URL (env minio) harus = https://{$MINIO_CONSOLE_DOMAIN}.
+{$MINIO_CONSOLE_DOMAIN} {
+	reverse_proxy minio:9001
 }
 
 # ---- Portainer (UI manajemen Docker) — dilindungi basic_auth ----
