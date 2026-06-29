@@ -243,13 +243,15 @@ class OpenCodeGoProvider:
     name = "opencode_go"
 
     def __init__(self, api_key: str, model: str, base_url: str,
-                 provider_type: str = "anthropic", max_tokens: int = 2000):
+                 provider_type: str = "anthropic", max_tokens: int = 2000,
+                 timeout: float = 300.0, reasoning_effort: str = ""):
         self.api_key = api_key
         self.model = model or "minimax-m2.7"
         self.base_url = (base_url or "https://opencode.ai/zen/go").rstrip("/")
         self.provider_type = (provider_type or "anthropic").lower()
         self.max_tokens = max_tokens
-        self._client = httpx.Client(timeout=120.0)
+        self.reasoning_effort = (reasoning_effort or "").strip()
+        self._client = httpx.Client(timeout=timeout)
 
     def _user_content(self, field_key, prompt, context) -> str:
         return (f"INSTRUKSI FIELD ({field_key}): {prompt}\n\n"
@@ -267,11 +269,21 @@ class OpenCodeGoProvider:
                     {"role": "user", "content": user},
                 ],
             }
+            # Pangkas reasoning utk model reasoning (GLM-5.2): tugas ekstraksi
+            # terstruktur tak butuh berpikir dalam, dan reasoning bikin batch
+            # 48 field >10 menit. Dilewati bila kosong (model non-reasoning).
+            if self.reasoning_effort:
+                body["reasoning_effort"] = self.reasoning_effort
             headers = {"Authorization": f"Bearer {self.api_key}",
                        "Content-Type": "application/json"}
             r = self._client.post(url, headers=headers, json=body)
             r.raise_for_status()
-            return r.json()["choices"][0]["message"]["content"]
+            # Reasoning model (mis. GLM-5.2) menaruh jawaban di `content` dan
+            # proses berpikir di `reasoning_content`. Bila max_tokens habis saat
+            # reasoning, `content` bisa null → kembalikan "" agar parser tak
+            # crash (field jadi "Tidak dinyatakan", bukan exception).
+            msg = r.json()["choices"][0]["message"]
+            return msg.get("content") or ""
 
         # default: anthropic-style messages. Header x-api-key (BUKAN Bearer).
         url = f"{self.base_url}/v1/messages"

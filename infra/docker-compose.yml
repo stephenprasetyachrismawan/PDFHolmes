@@ -125,6 +125,11 @@ services:
       OPENCODE_GO_PROVIDER_TYPE: ${OPENCODE_GO_PROVIDER_TYPE:-anthropic}
       OPENCODE_GO_BASE_URL: ${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go}
       OPENCODE_GO_MAX_TOKENS: ${OPENCODE_GO_MAX_TOKENS:-2000}
+      OPENCODE_GO_BATCH_MAX_TOKENS: ${OPENCODE_GO_BATCH_MAX_TOKENS:-16000}
+      # Reasoning model (GLM-5.2) lambat utk batch 48 field -> timeout longgar.
+      OPENCODE_GO_TIMEOUT_S: ${OPENCODE_GO_TIMEOUT_S:-300}
+      # Pangkas reasoning (low/none) -> batch 48 field dari >10mnt jadi <1mnt.
+      OPENCODE_GO_REASONING_EFFORT: ${OPENCODE_GO_REASONING_EFFORT:-low}
     depends_on:
       - redis
       - migrate

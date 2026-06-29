@@ -34,6 +34,14 @@ OPENCODE_GO_BASE_URL = os.environ.get("OPENCODE_GO_BASE_URL", "https://opencode.
 OPENCODE_GO_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_MAX_TOKENS", "2000"))
 # Mode BATCH: 1 panggilan utk SEMUA field (48) -> butuh output besar.
 OPENCODE_GO_BATCH_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_BATCH_MAX_TOKENS", "16000"))
+# Timeout HTTP (detik). Reasoning model (mis. GLM-5.2) lambat utk batch 48 field
+# -> butuh longgar. Default 300s.
+OPENCODE_GO_TIMEOUT_S = float(os.environ.get("OPENCODE_GO_TIMEOUT_S", "300"))
+# reasoning_effort (openai-compatible). Reasoning model spt GLM-5.2 buang ~80%
+# waktu di "berpikir" -> batch 48 field bisa >10 menit. Ekstraksi terstruktur
+# tak butuh reasoning dalam; "low"/"none" memangkasnya drastis (128s -> ~8s).
+# Kosongkan utk tak mengirim param (model non-reasoning). Hanya dipakai openai.
+OPENCODE_GO_REASONING_EFFORT = os.environ.get("OPENCODE_GO_REASONING_EFFORT", "low")
 
 # Batas panjang konteks (char) yg dikirim ke LLM per field.
 MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "24000"))

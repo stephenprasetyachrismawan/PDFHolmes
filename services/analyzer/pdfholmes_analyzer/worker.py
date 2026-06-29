@@ -141,6 +141,8 @@ def _select_provider(conn, user_id: str) -> tuple[AIProvider, str | None, str | 
         base_url=config.OPENCODE_GO_BASE_URL,
         provider_type=config.OPENCODE_GO_PROVIDER_TYPE,
         max_tokens=config.OPENCODE_GO_MAX_TOKENS,
+        timeout=config.OPENCODE_GO_TIMEOUT_S,
+        reasoning_effort=config.OPENCODE_GO_REASONING_EFFORT,
     )
     return provider, "opencode_go", config.OPENCODE_GO_MODEL
 
