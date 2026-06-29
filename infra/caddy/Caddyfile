@@ -49,12 +49,13 @@
 	reverse_proxy minio:9001
 }
 
-# ---- Portainer (UI manajemen Docker) — dilindungi basic_auth ----
+# ---- Portainer (UI manajemen Docker) ----
+# JANGAN pasang basic_auth di sini: Caddy basic_auth & Portainer dua-duanya
+# pakai header Authorization. XHR Portainer kirim "Bearer <jwt>" yang menimpa
+# "Basic ..." → Caddy balas 401 → login Portainer gagal ("unauthorized").
+# Keamanan via login admin Portainer sendiri.
 # Portainer serve HTTPS self-signed di 9443; lewati verifikasi TLS internal.
 {$PORTAINER_DOMAIN} {
-	basic_auth {
-		admin $2a$14$PxbHBvPuTQvCEgz8xSntfenti0Np9W2jrrIveyIEJQXDT7O5JoTS6
-	}
 	reverse_proxy https://portainer:9443 {
 		transport http {
 			tls_insecure_skip_verify
