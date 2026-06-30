@@ -11,7 +11,14 @@ const MAP: Record<DocStatus, { label: string; cls: string }> = {
   failed: { label: "Gagal", cls: "bg-red-100 text-red-700" },
 };
 
-export function StatusBadge({ status }: { status: DocStatus }) {
+export function StatusBadge({ status, error }: { status: DocStatus; error?: string | null }) {
   const s = MAP[status];
-  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${s.cls}`}>{s.label}</span>;
+  // Saat gagal, error jadi tooltip (hover) — detail penuh ditampilkan di
+  // halaman dokumen / kartu library.
+  const title = status === "failed" && error ? error : undefined;
+  return (
+    <span title={title} className={`rounded px-2 py-0.5 text-xs font-medium ${s.cls}`}>
+      {s.label}
+    </span>
+  );
 }

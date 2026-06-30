@@ -21,7 +21,7 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
     <div>
       <div className="mb-4 flex items-center gap-3">
         <h1 className="truncate text-xl font-semibold">{doc.data.originalFilename}</h1>
-        <StatusBadge status={doc.data.status} />
+        <StatusBadge status={doc.data.status} error={doc.data.error} />
         <button
           onClick={() => {
             if (
@@ -38,6 +38,11 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
           {deleteDoc.isPending ? "Menghapus…" : "🗑 Hapus"}
         </button>
       </div>
+      {doc.data.status === "failed" && doc.data.error && (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <span className="font-semibold">Alasan gagal:</span> {doc.data.error}
+        </div>
+      )}
       {/* Kiri: PDF viewer · Kanan: panel analisis (§1) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="h-[80vh] overflow-auto rounded-lg border bg-white">

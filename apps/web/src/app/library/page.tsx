@@ -94,13 +94,18 @@ export default function LibraryPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-2xl">📄</span>
-                  <StatusBadge status={d.status} />
+                  <StatusBadge status={d.status} error={d.error} />
                 </div>
                 <p className="mt-2 line-clamp-2 font-medium">{d.originalFilename}</p>
                 <p className="mt-1 text-xs text-slate-500">
                   {d.pageCount ? `${d.pageCount} hlm · ` : ""}
                   {new Date(d.createdAt).toLocaleDateString("id-ID")}
                 </p>
+                {d.status === "failed" && d.error && (
+                  <p className="mt-1 line-clamp-2 text-xs text-red-600" title={d.error}>
+                    {d.error}
+                  </p>
+                )}
               </Link>
               <button
                 title="Hapus dokumen"
