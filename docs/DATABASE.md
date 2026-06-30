@@ -62,8 +62,8 @@ curl https://pdfholmes.stevewithcode.net/api/health/ready   # {"db":"ok","redis"
 | `documents` | Metadata PDF + status siklus hidup |
 | `extractions` | Hasil parser: `full_text`, `sections`, `metadata` (1:1 ke documents) |
 | `analyses` | Satu sesi analisis (bahasa, model) |
-| `analysis_sections` | 48 field hasil + `embedding` (pgvector) |
-| `ai_usage` | Audit pemakaian AI (tanpa prompt, tanpa key) |
+| `analysis_sections` | 48 field hasil dan `embedding` (pgvector) |
+| `ai_usage` | Tabel audit warisan dari fitur chat yang sudah dihapus; tidak ada penulis aktif sekarang |
 | `_migrations` | Catatan migrasi yang sudah diterapkan |
 
 ---

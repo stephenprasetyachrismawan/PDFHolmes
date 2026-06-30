@@ -98,6 +98,10 @@ DB_IAM_REGION=ap-southeast-1
 
 # AI (lihat OPENCODE.md)
 OPENCODE_GO_API_KEY=sk-...
+OPENCODE_GO_MODEL=glm-5.2
+OPENCODE_GO_PROVIDER_TYPE=openai
+OPENCODE_GO_TIMEOUT_S=900            # longgar untuk PDF besar; default kode 900
+OPENCODE_GO_REASONING_EFFORT=low     # pangkas reasoning model (GLM-5.2)
 ```
 
 ---
