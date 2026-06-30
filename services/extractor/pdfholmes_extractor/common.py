@@ -48,13 +48,17 @@ def minio_client() -> Minio:
 
 
 def publish_status(r: redis.Redis, document_id: str, status: str,
-                   error: str | None = None, field_key: str | None = None) -> None:
+                   error: str | None = None, field_key: str | None = None,
+                   message: str | None = None) -> None:
     """Publish ke channel yg dikonsumsi api (SSE -> browser)."""
     evt: dict = {"documentId": document_id, "status": status}
     if error:
         evt["error"] = error
     if field_key:
         evt["fieldKey"] = field_key
+    # Baris log untuk panel pemrosesan di browser.
+    if message:
+        evt["message"] = message
     r.publish(config.CHANNEL_STATUS, json.dumps(evt))
 
 

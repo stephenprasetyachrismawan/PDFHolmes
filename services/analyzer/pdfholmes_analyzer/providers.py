@@ -251,7 +251,13 @@ class OpenCodeGoProvider:
         self.provider_type = (provider_type or "anthropic").lower()
         self.max_tokens = max_tokens
         self.reasoning_effort = (reasoning_effort or "").strip()
-        self._client = httpx.Client(timeout=timeout)
+        # Connect tetap pendek (15s) tapi READ longgar: panggilan batch 48 field
+        # ke reasoning model bisa lama; jangan putus di tengah jawaban.
+        self._client = httpx.Client(
+            timeout=httpx.Timeout(timeout, connect=15.0)
+        )
+        # Respons mentah terakhir dari AI (utk panel log di browser).
+        self.last_raw_response = ""
 
     def _user_content(self, field_key, prompt, context) -> str:
         return (f"INSTRUKSI FIELD ({field_key}): {prompt}\n\n"
@@ -315,6 +321,7 @@ class OpenCodeGoProvider:
         text = self._raw_chat(
             _batch_system_prompt(language), _batch_user_prompt(fields, context), max_tokens,
         )
+        self.last_raw_response = text or ""
         return _parse_batch(text, fields)
 
     def embed(self, text: str) -> list[float] | None:
@@ -327,6 +334,7 @@ class MockProvider:
     """Provider deterministik tanpa API — demo pipeline end-to-end tanpa kredensial."""
 
     name = "mock"
+    last_raw_response = ""
 
     def analyze_field(self, field_key, prompt, context, language, default_source) -> FieldResult:
         snippet = (context or "").strip().replace("\n", " ")[:200]
@@ -339,6 +347,7 @@ class MockProvider:
         return FieldResult(content_md=content, source=default_source, confidence=0.1)
 
     def analyze_batch(self, fields, context, language, max_tokens) -> dict:
+        self.last_raw_response = f"(mock) {len(fields)} field di-generate tanpa AI."
         return {
             f.key: self.analyze_field(f.key, f.prompt, context, language, f.default_source)
             for f in fields

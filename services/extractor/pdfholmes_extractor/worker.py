@@ -108,7 +108,7 @@ def handle_extract(conn, mc, r, job: dict) -> None:
         log.warning("dokumen %s tidak ada, skip", document_id)
         return
 
-    publish_status(r, document_id, "extracting")
+    publish_status(r, document_id, "extracting", message="Mengunduh PDF dari penyimpanan…")
 
     # 1. Ambil PDF dari MinIO.
     resp = mc.get_object(doc["bucket"], doc["object_key"])
@@ -117,9 +117,13 @@ def handle_extract(conn, mc, r, job: dict) -> None:
     finally:
         resp.close()
         resp.release_conn()
+    publish_status(r, document_id, "extracting",
+                   message=f"PDF terunduh ({len(pdf_bytes) / 1_048_576:.1f} MB). Mengekstrak teks…")
 
     # 2. PyMuPDF — teks + metadata + page_count.
     pdf = extract_pdf(pdf_bytes)
+    publish_status(r, document_id, "extracting",
+                   message=f"PyMuPDF: {pdf.page_count} halaman, {len(pdf.full_text)} char teks.")
 
     # 3. GROBID — TEI XML terstruktur (best-effort).
     tei_xml = grobid.process_fulltext(pdf_bytes)
@@ -127,6 +131,8 @@ def handle_extract(conn, mc, r, job: dict) -> None:
     grobid_meta: dict = {}
     if tei_xml:
         grobid_meta, sections = grobid.parse_tei(tei_xml)
+    publish_status(r, document_id, "extracting",
+                   message=("GROBID: TEI diuraikan." if tei_xml else "GROBID dilewati (teks PyMuPDF saja)."))
 
     # Gabung metadata: GROBID diutamakan, fallback PyMuPDF.
     metadata = {**pdf.metadata, **{k: v for k, v in grobid_meta.items() if v}}
@@ -138,7 +144,7 @@ def handle_extract(conn, mc, r, job: dict) -> None:
         sections=sections, metadata=metadata,
     )
     set_document_status(conn, document_id, "extracted", page_count=pdf.page_count)
-    publish_status(r, document_id, "extracted")
+    publish_status(r, document_id, "extracted", message="Ekstraksi tersimpan.")
 
     # 5. Chain ke analisis (§6): enqueue ANALYZE + status analyzing.
     analyze_job = {
@@ -149,7 +155,7 @@ def handle_extract(conn, mc, r, job: dict) -> None:
     }
     r.lpush(config.QUEUE_ANALYZE, json.dumps(analyze_job))
     set_document_status(conn, document_id, "analyzing")
-    publish_status(r, document_id, "analyzing")
+    publish_status(r, document_id, "analyzing", message="Antre analisis AI…")
     log.info("EXTRACT selesai doc=%s -> ANALYZE enqueued", document_id)
 
 

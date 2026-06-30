@@ -6,13 +6,14 @@ import { useDocument, useDocumentStatus, useDeleteDocument } from "@/lib/hooks";
 import { PdfViewer } from "@/components/PdfViewer";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ProcessingLog } from "@/components/ProcessingLog";
 
 export default function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const doc = useDocument(id);
   const deleteDoc = useDeleteDocument();
-  useDocumentStatus(id); // langganan SSE -> update status & section realtime
+  const { logs } = useDocumentStatus(id); // SSE -> status, section realtime, log
 
   if (doc.isLoading) return <p className="text-slate-500">Memuat dokumen…</p>;
   if (doc.error || !doc.data) return <p className="text-red-600">Dokumen tidak ditemukan.</p>;
@@ -52,6 +53,8 @@ export default function DocumentPage({ params }: { params: Promise<{ id: string 
           <AnalysisPanel documentId={id} docStatus={doc.data.status} />
         </div>
       </div>
+      {/* Log pemrosesan semua dokumen (progres + respons AI), fixed + scroll. */}
+      <ProcessingLog logs={logs} />
     </div>
   );
 }

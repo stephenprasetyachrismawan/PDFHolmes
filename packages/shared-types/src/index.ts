@@ -91,6 +91,7 @@ export interface StatusEvent {
   status: DocStatus;
   error?: string;
   fieldKey?: string; // field yang baru terisi (streaming)
+  message?: string; // baris log pemrosesan (mis. respons mentah AI) utk panel log
 }
 
 // Nama queue Redis (list). Harus identik dgn worker Python.

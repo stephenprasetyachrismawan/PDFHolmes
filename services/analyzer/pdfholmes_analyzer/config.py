@@ -16,6 +16,8 @@ DB_IAM_REGION = (
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 
 QUEUE_ANALYZE = "pdfholmes:queue:analyze"
+# Dipakai utk MENGULANG ekstraksi bila baris extractions hilang saat ANALYZE.
+QUEUE_EXTRACT = "pdfholmes:queue:extract"
 CHANNEL_STATUS = "pdfholmes:status"
 
 EMBEDDING_DIM = int(os.environ.get("EMBEDDING_DIM", "1536"))
@@ -35,8 +37,9 @@ OPENCODE_GO_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_MAX_TOKENS", "2000"))
 # Mode BATCH: 1 panggilan utk SEMUA field (48) -> butuh output besar.
 OPENCODE_GO_BATCH_MAX_TOKENS = int(os.environ.get("OPENCODE_GO_BATCH_MAX_TOKENS", "16000"))
 # Timeout HTTP (detik). Reasoning model (mis. GLM-5.2) lambat utk batch 48 field
-# -> butuh longgar. Default 300s.
-OPENCODE_GO_TIMEOUT_S = float(os.environ.get("OPENCODE_GO_TIMEOUT_S", "300"))
+# -> butuh longgar. Dokumen besar (4MB+) dgn output 16k token bisa >5 menit dan
+# kena "read operation timed out". Default dilonggarkan ke 900s (15 menit).
+OPENCODE_GO_TIMEOUT_S = float(os.environ.get("OPENCODE_GO_TIMEOUT_S", "900"))
 # reasoning_effort (openai-compatible). Reasoning model spt GLM-5.2 buang ~80%
 # waktu di "berpikir" -> batch 48 field bisa >10 menit. Ekstraksi terstruktur
 # tak butuh reasoning dalam; "low"/"none" memangkasnya drastis (128s -> ~8s).

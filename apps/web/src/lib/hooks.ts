@@ -150,12 +150,38 @@ export function useTriggerAnalyze(documentId: string) {
   });
 }
 
+export interface ProcessLogLine {
+  ts: string; // jam:menit:detik lokal
+  text: string;
+  kind: "status" | "field" | "message" | "error";
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  uploaded: "Terunggah",
+  extracting: "Mengekstrak…",
+  extracted: "Terekstrak",
+  analyzing: "Menganalisis…",
+  analyzed: "Selesai",
+  failed: "Gagal",
+};
+
 // SSE status: dengarkan progres pipeline; refresh analysis saat ada field baru.
+// Mengembalikan `logs` (akumulasi sejak halaman dibuka) utk panel pemrosesan —
+// termasuk respons mentah API AI yang dipublish worker.
 export function useDocumentStatus(documentId: string) {
   const { apiUrl, sseToken } = useApi();
   const qc = useQueryClient();
+  const [logs, setLogs] = useState<ProcessLogLine[]>([]);
+
   useEffect(() => {
     if (!documentId) return;
+    setLogs([]); // reset saat ganti dokumen
+    const append = (text: string, kind: ProcessLogLine["kind"]) =>
+      setLogs((prev) =>
+        // batasi 500 baris terakhir agar tak tumbuh tak terbatas
+        [...prev, { ts: new Date().toLocaleTimeString(), text, kind }].slice(-500),
+      );
+
     // EventSource tak bisa kirim header → auth lewat query param.
     const url = `${apiUrl}/api/events/documents/${documentId}${sseToken}`;
     const es = new EventSource(url, { withCredentials: true });
@@ -169,6 +195,16 @@ export function useDocumentStatus(documentId: string) {
         if (evt.fieldKey || evt.status === "analyzed" || evt.status === "extracted") {
           qc.invalidateQueries({ queryKey: ["analysis", documentId] });
         }
+
+        // Susun baris log: pesan worker > error > field > perubahan status.
+        if (evt.message) append(evt.message, "message");
+        else if (evt.error) append(`Gagal: ${evt.error}`, "error");
+        else if (evt.fieldKey) append(`Field terisi: ${evt.fieldKey}`, "field");
+        else
+          append(
+            `Status: ${STATUS_LABEL[evt.status] ?? evt.status}`,
+            evt.status === "failed" ? "error" : "status",
+          );
       } catch {
         /* abaikan */
       }
@@ -176,4 +212,6 @@ export function useDocumentStatus(documentId: string) {
     es.onerror = () => es.close();
     return () => es.close();
   }, [documentId, apiUrl, qc]);
+
+  return { logs };
 }

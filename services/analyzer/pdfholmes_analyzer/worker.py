@@ -156,7 +156,15 @@ def handle_analyze(conn, r, job: dict) -> None:
 
     extraction = _load_extraction(conn, document_id)
     if not extraction:
-        raise RuntimeError("extraction belum ada untuk dokumen ini")
+        # Jangan tandai 'failed': ekstraksi mungkin belum jalan / hilang. ULANGI
+        # proses ekstraksi (EXTRACT meng-chain balik ke ANALYZE saat selesai).
+        log.warning("extraction belum ada doc=%s -> mengulang EXTRACT", document_id)
+        set_document_status(conn, document_id, "extracting")
+        publish_status(r, document_id, "extracting",
+                       message="Extraction belum ada → mengulang proses ekstraksi.")
+        r.lpush(config.QUEUE_EXTRACT, json.dumps(
+            {"type": "EXTRACT", "documentId": document_id, "userId": user_id}))
+        return
 
     provider, provider_name, model = _select_provider(conn, user_id)
     analysis_id = _find_or_create_analysis(conn, document_id, language, provider_name, model)
@@ -176,12 +184,25 @@ def handle_analyze(conn, r, job: dict) -> None:
     if research_interest:
         ctx = f"MINAT RISET PENGGUNA: {research_interest}\n\n{ctx}"
 
+    publish_status(
+        r, document_id, "analyzing",
+        message=(f"Memanggil AI (model={model or provider.name}, {len(fields)} field, "
+                 f"konteks {len(ctx)} char, timeout {int(config.OPENCODE_GO_TIMEOUT_S)}s)…"),
+    )
+
     try:
         results = provider.analyze_batch(
             fields, ctx, language, config.OPENCODE_GO_BATCH_MAX_TOKENS
         )
+        raw = getattr(provider, "last_raw_response", "") or ""
+        if raw:
+            snippet = raw.replace("\n", " ").strip()[:800]
+            publish_status(r, document_id, "analyzing",
+                           message=f"Respons AI ({len(raw)} char): {snippet}")
     except Exception as exc:  # noqa: BLE001 — batch gagal: tandai tiap field gagal
         log.warning("batch analyze gagal: %s", exc)
+        publish_status(r, document_id, "analyzing",
+                       message=f"⚠ Panggilan AI gagal: {str(exc)[:200]}")
         results = {
             f.key: FieldResult(
                 content_md=f"_Gagal menganalisis: {str(exc)[:200]}_",
@@ -205,7 +226,8 @@ def handle_analyze(conn, r, job: dict) -> None:
         publish_status(r, document_id, "analyzing", field_key=field.key)
 
     _finalize(conn, analysis_id, document_id, provider.name)
-    publish_status(r, document_id, "analyzed")
+    publish_status(r, document_id, "analyzed",
+                   message=f"Analisis selesai — {len(fields)} field tersimpan.")
     log.info("ANALYZE selesai doc=%s (%d field)", document_id, len(schema_fields()))
 
 

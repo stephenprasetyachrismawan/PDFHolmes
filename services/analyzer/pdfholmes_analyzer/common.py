@@ -38,12 +38,16 @@ def redis_client() -> redis.Redis:
 
 
 def publish_status(r: redis.Redis, document_id: str, status: str,
-                   error: str | None = None, field_key: str | None = None) -> None:
+                   error: str | None = None, field_key: str | None = None,
+                   message: str | None = None) -> None:
     evt: dict = {"documentId": document_id, "status": status}
     if error:
         evt["error"] = error
     if field_key:
         evt["fieldKey"] = field_key
+    # Baris log untuk panel pemrosesan di browser (mis. respons mentah AI).
+    if message:
+        evt["message"] = message
     r.publish(config.CHANNEL_STATUS, json.dumps(evt))
 
 
