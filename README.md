@@ -46,6 +46,148 @@ atas. Service `migrate` menyambung ke Aurora via IAM dan menerapkan migrasi saat
 
 Relasi antar-komponen dijelaskan di [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
+## Arsitektur
+
+### Pandangan umum
+
+Diagram berikut menunjukkan komponen yang berjalan dan ke mana datanya mengalir.
+Kotak di dalam "EC2 host" adalah container Docker dalam satu jaringan; tiga kotak di
+luar adalah layanan terkelola dan API eksternal.
+
+```mermaid
+flowchart LR
+  browser["Browser<br/>Next.js UI"]
+
+  subgraph host["EC2 host · Docker Compose"]
+    proxy["proxy<br/>Caddy 2"]
+    web["web<br/>Next.js 15"]
+    api["api<br/>NestJS BFF"]
+    extractor["extractor<br/>PyMuPDF + GROBID"]
+    analyzer["analyzer<br/>batch 48 field"]
+    redis[("redis<br/>queue + pub/sub")]
+    minio[("minio<br/>S3 bucket per-user")]
+  end
+
+  cognito["AWS Cognito<br/>Hosted UI + JWKS"]
+  aurora[("Aurora PostgreSQL<br/>pgvector · IAM auth")]
+  opencode["OpenCode Go<br/>penyedia AI"]
+
+  browser -->|login OIDC| cognito
+  browser -->|HTTPS Bearer id_token| proxy
+  proxy --> web
+  proxy -->|/api/*| api
+  browser -. presigned PUT/GET .-> minio
+  api -->|verifikasi JWT| cognito
+  api --> aurora
+  api -->|enqueue EXTRACT / ANALYZE| redis
+  redis -. SSE status + log .-> api
+  redis --> extractor
+  redis --> analyzer
+  extractor -->|baca PDF| minio
+  extractor --> aurora
+  extractor -.->|enqueue ANALYZE| redis
+  analyzer -->|1 prompt batch| opencode
+  analyzer --> aurora
+```
+
+Bagaimana elemen-elemen ini berhubungan:
+
+- Browser dan Cognito: login memakai Authorization Code dengan PKCE ke Hosted UI
+  Cognito. Browser menyimpan `id_token` dan mengirimnya sebagai Bearer ke `api`.
+- Browser dan proxy: semua trafik HTTPS masuk lewat Caddy. Caddy meneruskan `/api/*`
+  ke `api` dan sisanya ke `web`, jadi web dan API berbagi satu origin.
+- Browser dan MinIO: upload dan tampilan PDF memakai URL presigned, jadi berkas
+  mengalir langsung antara browser dan MinIO tanpa membebani `api`.
+- api dan Cognito: `api` memverifikasi tiap token lewat JWKS publik Cognito dan
+  mencocokkan issuer serta audiens sebelum melayani permintaan.
+- api dan redis: `api` tidak memproses PDF sendiri. Ia menaruh job `EXTRACT` dan
+  `ANALYZE` ke antrian Redis, lalu worker mengambilnya. Status balik ke browser lewat
+  pub/sub Redis yang diteruskan `api` sebagai SSE.
+- extractor dan analyzer: `extractor` membaca PDF dari MinIO, menulis hasil parser ke
+  Aurora, lalu meng-enqueue `ANALYZE`. `analyzer` mengirim satu prompt batch ke
+  OpenCode Go dan menyimpan 48 field ke Aurora.
+- Semua worker dan Aurora: penyimpanan data terpusat di Aurora. Worker dan `api`
+  menulis ke tabel yang sama, terpisah per `user_id`.
+
+### Pandangan deploy dan komputasi awan
+
+Diagram ini fokus pada tempat semuanya berjalan di AWS, plus dua dependensi eksternal
+(Let's Encrypt dan OpenCode Go).
+
+```mermaid
+flowchart TB
+  user(["Pengguna"])
+  le["Let's Encrypt<br/>ACME HTTP-01"]
+  oc["OpenCode Go API"]
+  dns["DNS A-record<br/>domain → Elastic IP<br/>MinIO via sslip.io"]
+
+  subgraph aws["AWS · ap-southeast-1"]
+    cognito["Cognito<br/>User Pool + Hosted UI"]
+    aurora[("Aurora Serverless v2<br/>PostgreSQL 17 + pgvector<br/>IAM auth · SSL · min ACU 0")]
+
+    subgraph ec2["EC2 Graviton t4g + Elastic IP"]
+      sg{"Security Group<br/>80 / 443 / 22"}
+      role["Instance role pdfholmes-ec2<br/>rds-db:connect via IMDS"]
+
+      subgraph docker["Docker Compose · satu jaringan"]
+        caddy["proxy · Caddy 2"]
+        web["web :3000"]
+        api["api :4000"]
+        extractor["extractor"]
+        analyzer["analyzer"]
+        grobid["grobid"]
+        redis[("redis")]
+        minio[("minio :9000 / :9001")]
+        migrate["migrate · sekali jalan"]
+        portainer["portainer :9000"]
+      end
+    end
+  end
+
+  user -->|HTTPS 443| dns
+  dns --> sg
+  sg --> caddy
+  caddy --> web
+  caddy --> api
+  caddy --> minio
+  caddy --> portainer
+  caddy -. ACME .- le
+  api -->|token IAM| role
+  extractor -->|token IAM| role
+  analyzer -->|token IAM| role
+  migrate -->|token IAM| role
+  role --> aurora
+  web -->|OIDC| cognito
+  api -->|JWKS| cognito
+  analyzer -->|HTTPS| oc
+```
+
+Bagaimana lapisan deploy ini berhubungan:
+
+- Satu host menjalankan semuanya. Seluruh stack hidup di satu instance EC2 Graviton
+  (`t4g`) dengan Elastic IP supaya alamatnya tetap saat instance di-restart. DNS hanya
+  butuh satu A-record ke Elastic IP itu; host MinIO memakai `sslip.io` yang memetakan
+  IP ke hostname tanpa perlu DNS tambahan.
+- Caddy adalah satu-satunya pintu masuk. Security Group hanya membuka port 80, 443, dan
+  22 (SSH dibatasi IP Anda). Caddy menerbitkan dan memperbarui sertifikat TLS sendiri
+  lewat tantangan ACME HTTP-01 ke Let's Encrypt, lalu mem-proxy ke `web`, `api`, MinIO,
+  dan Portainer. Port internal container (3000, 4000, 9000, 9443) tidak diekspos ke
+  internet.
+- Database terkelola dan terpisah. Aurora berada di luar EC2, bukan container. Ia
+  PostgreSQL Serverless v2 dengan pgvector dan min ACU 0, jadi cluster tidur saat idle.
+- Akses database tanpa password statis. `api`, `extractor`, `analyzer`, dan `migrate`
+  tidak menyimpan kredensial DB. Instance role EC2 `pdfholmes-ec2` punya izin
+  `rds-db:connect`; tiap service mengambil identitas itu lewat IMDS, membuat token IAM
+  15 menit, dan menyambung ke Aurora dengan SSL.
+- Identitas pengguna dari Cognito. `web` mengarahkan login ke Hosted UI Cognito (OIDC),
+  dan `api` memvalidasi token lewat JWKS Cognito. Tidak ada penyimpanan password di
+  aplikasi.
+- AI keluar lewat satu jalur. Hanya `analyzer` yang memanggil OpenCode Go, lewat HTTPS,
+  memakai key server. Tidak ada komponen lain yang menyentuh penyedia AI.
+- `grobid` dan `migrate` adalah pelengkap. `migrate` jalan sekali saat `up` untuk
+  menerapkan migrasi lalu keluar. `grobid` memperkaya parsing dan boleh dimatikan pada
+  host ber-RAM kecil tanpa menghentikan pipeline.
+
 ## Analisis: OpenCode Go
 
 PDFHo!mes bukan aplikasi BYOK. Pengguna tidak pernah memasukkan API key. Seluruh
